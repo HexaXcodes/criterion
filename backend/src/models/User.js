@@ -37,6 +37,10 @@ const userSchema = new mongoose.Schema({
   streak: {
     count: { type: Number, default: 0 },
     lastLogin: { type: Date, default: null }
+  },
+  points: {
+    type: Number,
+    default: 0
   }
 }, { timestamps: true });
 
