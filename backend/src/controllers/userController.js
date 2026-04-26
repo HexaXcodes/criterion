@@ -86,3 +86,23 @@ exports.addToWatchlist = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+// Leaderboard - top 10 users by points
+exports.getLeaderboard = async (req, res) => {
+  try {
+    const users = await User.find()
+      .select("name points streak")
+      .sort({ points: -1 })
+      .limit(10);
+
+    const leaderboard = users.map((user, index) => ({
+      rank: index + 1,
+      name: user.name,
+      points: user.points,
+      streak: user.streak.count
+    }));
+
+    res.json(leaderboard);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

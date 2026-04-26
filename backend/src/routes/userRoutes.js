@@ -5,8 +5,15 @@ const {
   getProfile,
   updatePreferences,
   markWatched,
-  addToWatchlist
+  addToWatchlist,
+  getLeaderboard
 } = require("../controllers/userController");
+
+router.get("/leaderboard", getLeaderboard);
+router.get("/profile", protect, getProfile);
+router.put("/preferences", protect, updatePreferences);
+router.post("/watched", protect, markWatched);
+router.post("/watchlist", protect, addToWatchlist);
 router.get("/streak", protect, async (req, res) => {
   try {
     const User = require("../models/User");
@@ -16,9 +23,5 @@ router.get("/streak", protect, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-router.get("/profile", protect, getProfile);
-router.put("/preferences", protect, updatePreferences);
-router.post("/watched", protect, markWatched);
-router.post("/watchlist", protect, addToWatchlist);
 
 module.exports = router;

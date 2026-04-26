@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { autoPopulateWatchlist } = require("./aiController");
 
 exports.signup = async (req, res) => {
   try {
@@ -55,7 +56,6 @@ exports.login = async (req, res) => {
     let pointsEarned = 0;
 
     if (!lastLogin) {
-      // First login ever
       user.streak.count = 1;
       user.streak.lastLogin = today;
       pointsEarned = 10;
@@ -69,17 +69,14 @@ exports.login = async (req, res) => {
       );
 
       if (diffDays === 0) {
-        // Already logged in today
         streakMessage = `Current streak: ${user.streak.count} days`;
         pointsEarned = 0;
       } else if (diffDays === 1) {
-        // Logged in yesterday — continue streak
         user.streak.count += 1;
         user.streak.lastLogin = today;
         pointsEarned = 10 * user.streak.count;
         streakMessage = `🔥 ${user.streak.count} day streak! +${pointsEarned} points`;
       } else {
-        // Missed a day — reset streak
         user.streak.count = 1;
         user.streak.lastLogin = today;
         pointsEarned = 10;
@@ -89,6 +86,9 @@ exports.login = async (req, res) => {
 
     user.points += pointsEarned;
     await user.save();
+
+    // Auto populate watchlist in background
+    const addedMovies = await autoPopulateWatchlist(user._id);
 
     const token = jwt.sign(
       { id: user._id },
@@ -102,6 +102,7 @@ exports.login = async (req, res) => {
       streakMessage,
       streak: user.streak.count,
       points: user.points,
+      addedToWatchlist: addedMovies || [],
       user: {
         _id: user._id,
         name: user.name,
