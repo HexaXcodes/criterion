@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Recurse -Force)",
+      "Bash(Select-Object FullName)",
+      "Bash(ls -la \"c:\\\\\\\\Users\\\\\\\\Aadvik Gowda\\\\\\\\OneDrive\\\\\\\\ドキュメント\\\\\\\\Desktop\\\\\\\\Movierevproj\")",
+      "Bash(find \"c:\\\\\\\\Users\\\\\\\\Aadvik Gowda\\\\\\\\OneDrive\\\\\\\\ドキュメント\\\\\\\\Desktop\\\\\\\\Movierevproj\" -type f -name \"*.json\")",
+      "Bash(ls -la \"c:\\\\\\\\Users\\\\\\\\Aadvik Gowda\\\\\\\\OneDrive\\\\\\\\ドキュメント\\\\\\\\Desktop\\\\\\\\Movierevproj\\\\\\\\backend\")",
+      "Bash(ls -la \"c:\\\\\\\\Users\\\\\\\\Aadvik Gowda\\\\\\\\OneDrive\\\\\\\\ドキュメント\\\\\\\\Desktop\\\\\\\\Movierevproj\\\\\\\\frontend\")",
+      "Bash(find \"c:\\\\\\\\Users\\\\\\\\Aadvik Gowda\\\\\\\\OneDrive\\\\\\\\ドキュメント\\\\\\\\Desktop\\\\\\\\Movierevproj\\\\\\\\backend\\\\\\\\src\" -type f -name \"*.js\")",
+      "Bash(ls -la \"c:\\\\\\\\Users\\\\\\\\Aadvik Gowda\\\\\\\\OneDrive\\\\\\\\ドキュメント\\\\\\\\Desktop\\\\\\\\Movierevproj\\\\\\\\backend\\\\\\\\src\")",
+      "Bash(find \"c:\\\\\\\\Users\\\\\\\\Aadvik Gowda\\\\\\\\OneDrive\\\\\\\\ドキュメント\\\\\\\\Desktop\\\\\\\\Movierevproj\\\\\\\\frontend\\\\\\\\src\" -type f \\\\\\( -name \"*.jsx\" -o -name \"*.js\" -o -name \"*.tsx\" -o -name \"*.ts\" \\\\\\))",
+      "Bash(find \"c:\\\\\\\\Users\\\\\\\\Aadvik Gowda\\\\\\\\OneDrive\\\\\\\\ドキュメント\\\\\\\\Desktop\\\\\\\\Movierevproj\\\\\\\\backend\\\\\\\\src\\\\\\\\routes\" -type f -name \"*.js\")"
+    ]
+  }
+}

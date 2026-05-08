@@ -1,0 +1,252 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-deep: #0a0a0a;
+  --bg-base: #131313;
+  --pink-neon: #ff4b89;
+  --pink-soft: #ffb1c3;
+  --teal-neon: #00dbe9;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-deep);
+  color: #e2e2e2;
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 75, 137, 0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 75, 137, 0.5); }
+
+/* Glassmorphic card */
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.glass-pink {
+  background: linear-gradient(135deg, rgba(255, 75, 137, 0.15), rgba(255, 177, 195, 0.05));
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 75, 137, 0.25);
+}
+
+/* Criterion brand wordmark style */
+.brand-wordmark {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.05em;
+  background: linear-gradient(135deg, #ff4b89 0%, #ff6b9d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 30px rgba(255, 75, 137, 0.5);
+}
+
+/* Display headline with white luminance */
+.display-glow {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #ffffff;
+  text-shadow: 0 0 40px rgba(255, 255, 255, 0.4), 0 0 80px rgba(255, 177, 195, 0.2);
+}
+
+/* Pink gradient pill button */
+.btn-primary {
+  background: linear-gradient(135deg, #ff4b89, #ff6b9d);
+  color: #0a0a0a;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 9999px;
+  padding: 16px 32px;
+  border: none;
+  transition: all 200ms ease;
+  box-shadow: 0 0 30px rgba(255, 75, 137, 0.4), 0 4px 20px rgba(255, 75, 137, 0.2);
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 50px rgba(255, 75, 137, 0.6), 0 6px 30px rgba(255, 75, 137, 0.3);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 219, 233, 0.4);
+  color: #e2e2e2;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 9999px;
+  padding: 16px 32px;
+  transition: all 200ms ease;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  border-color: rgba(0, 219, 233, 0.7);
+  background: rgba(0, 219, 233, 0.08);
+}
+
+/* Genre chip */
+.chip-genre {
+  background: rgba(0, 219, 233, 0.15);
+  border: 1px solid rgba(0, 219, 233, 0.4);
+  color: #00dbe9;
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.chip-genre.active {
+  background: linear-gradient(135deg, #ff4b89, #ff6b9d);
+  border-color: transparent;
+  color: #0a0a0a;
+}
+
+/* Pink chip variant */
+.chip-pink {
+  background: rgba(255, 75, 137, 0.15);
+  border: 1px solid rgba(255, 75, 137, 0.4);
+  color: #ff4b89;
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Skeleton loader */
+.skeleton {
+  background: linear-gradient(90deg, #1a1a1a 25%, #252525 50%, #1a1a1a 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
+  border-radius: 8px;
+}
+
+/* Pet companion container */
+.pet-container {
+  position: fixed;
+  z-index: 5;
+  pointer-events: auto;
+  user-select: none;
+  transition: opacity 1500ms ease;
+}
+
+.pet-container.scrolling {
+  opacity: 0.3 !important;
+  transition: opacity 200ms ease;
+}
+
+/* Genre-based backgrounds */
+.bg-horror { background: radial-gradient(ellipse at top, #1a0000 0%, #0a0a0a 70%); }
+.bg-thriller { background: radial-gradient(ellipse at top, #0d0d1a 0%, #0a0a0a 70%); }
+.bg-scifi { background: radial-gradient(ellipse at top, #00131a 0%, #0a0a0a 70%); }
+.bg-action { background: radial-gradient(ellipse at top, #1a0d00 0%, #0a0a0a 70%); }
+.bg-romance { background: radial-gradient(ellipse at top, #1a0010 0%, #0a0a0a 70%); }
+.bg-comedy { background: radial-gradient(ellipse at top, #0d1a00 0%, #0a0a0a 70%); }
+.bg-drama { background: radial-gradient(ellipse at top, #0a0a14 0%, #0a0a0a 70%); }
+.bg-animation { background: radial-gradient(ellipse at top, #100a1a 0%, #0a0a0a 70%); }
+.bg-default { background: #131313; }
+
+.genre-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  transition: background 600ms ease;
+  pointer-events: none;
+}
+
+/* Star rating */
+.stars-container {
+  display: inline-flex;
+  gap: 2px;
+}
+
+/* Toast */
+.toast-enter {
+  animation: slideDown 400ms ease-out;
+}
+
+/* Hide scrollbar on horizontal scrollers */
+.scroll-x {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+/* Bottom nav safe area */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Auth input */
+.input-glass {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e2e2e2;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 15px;
+  width: 100%;
+  transition: border-color 200ms ease, background 200ms ease;
+  outline: none;
+}
+
+.input-glass:focus {
+  border-color: rgba(255, 75, 137, 0.6);
+  background: rgba(255, 75, 137, 0.04);
+  box-shadow: 0 0 0 4px rgba(255, 75, 137, 0.08);
+}
+
+.input-glass::placeholder {
+  color: rgba(226, 226, 226, 0.3);
+}
+
+/* Z-index layering */
+.z-bg { z-index: 0; }
+.z-pet { z-index: 5; }
+.z-content { z-index: 10; }
+.z-nav { z-index: 30; }
+.z-modal { z-index: 50; }
+.z-toast { z-index: 60; }
