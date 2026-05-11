@@ -22,6 +22,10 @@ const movieSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  language: {
+    type: String,
+    default: 'en'
+  },
   tmdbId: {
     type: Number,
     unique: true,

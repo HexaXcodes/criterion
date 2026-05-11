@@ -8,12 +8,13 @@ import GenreBackground from '../components/GenreBackground'
 import MoviePoster from '../components/MoviePoster'
 import StarRating from '../components/StarRating'
 import BottomNav from '../components/BottomNav'
+import TrailerModal from '../components/TrailerModal'
 import { timeAgo } from '../utils/helpers'
 
 export default function MovieDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { isAuthenticated, showToast } = useAuth()
+  const { isAuthenticated, showToast, showAuthGate } = useAuth()
 
   const [movie, setMovie] = useState(null)
   const [reviews, setReviews] = useState([])
@@ -23,6 +24,7 @@ export default function MovieDetailPage() {
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [showTrailer, setShowTrailer] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -34,7 +36,7 @@ export default function MovieDetailPage() {
 
   const handleAddToWatchlist = async () => {
     if (!isAuthenticated) {
-      showToast('Sign in to use watchlist', 'info')
+      showAuthGate('add films to your watchlist')
       return
     }
     try {
@@ -47,7 +49,7 @@ export default function MovieDetailPage() {
 
   const handleMarkWatched = async () => {
     if (!isAuthenticated) {
-      showToast('Sign in to track watched', 'info')
+      showAuthGate('track films you\'ve watched')
       return
     }
     try {
@@ -61,7 +63,7 @@ export default function MovieDetailPage() {
   const handleSubmitReview = async (e) => {
     e.preventDefault()
     if (!isAuthenticated) {
-      showToast('Sign in to leave a review', 'info')
+      showAuthGate('leave a review')
       return
     }
     if (!rating) {
@@ -129,6 +131,7 @@ export default function MovieDetailPage() {
         <MoviePoster
           posterUrl={movie.posterUrl}
           title={movie.title}
+          size="original"
           className="absolute inset-0 w-full h-full"
         />
         <div
@@ -177,6 +180,17 @@ export default function MovieDetailPage() {
           </button>
           <button onClick={handleMarkWatched} className="btn-secondary flex-1 text-xs">
             ✓ Watched
+          </button>
+          <button
+            onClick={() => setShowTrailer(true)}
+            className="flex-1 text-xs flex items-center justify-center gap-1 rounded-2xl font-semibold transition active:scale-95"
+            style={{
+              background: 'linear-gradient(135deg, #ff4b89, #ff6b9d)',
+              color: '#0a0a0a',
+              padding: '12px 0',
+            }}
+          >
+            ▶ Trailer
           </button>
         </div>
 
@@ -240,6 +254,14 @@ export default function MovieDetailPage() {
       </div>
 
       <BottomNav />
+
+      {showTrailer && (
+        <TrailerModal
+          movieId={id}
+          movieTitle={movie.title}
+          onClose={() => setShowTrailer(false)}
+        />
+      )}
     </div>
   )
 }

@@ -8,6 +8,7 @@ import GenreBackground from '../components/GenreBackground'
 import TopBar from '../components/TopBar'
 import BottomNav from '../components/BottomNav'
 import MoviePoster from '../components/MoviePoster'
+import TrailerModal from '../components/TrailerModal'
 
 export default function FeedPage() {
   const { showToast } = useAuth()
@@ -17,7 +18,10 @@ export default function FeedPage() {
   const [index, setIndex] = useState(0)
   const [liked, setLiked] = useState(new Set())
   const [saved, setSaved] = useState(new Set())
+  const [showTrailer, setShowTrailer] = useState(false)
   const touchStartY = useRef(null)
+  const isSwiping = useRef(false)
+  const seenIdsRef = useRef([])
 
   useEffect(() => {
     moviesApi
@@ -35,38 +39,81 @@ export default function FeedPage() {
       .finally(() => setLoading(false))
   }, [showToast])
 
-  const movie = movies[index]
+  const [refreshing, setRefreshing] = useState(false)
 
-  const next = () => setIndex((i) => Math.min(i + 1, movies.length - 1))
+  const movie = movies[index]
+  const movieId = movie?._id || movie?.id
+
+  const refresh = () => {
+    setRefreshing(true)
+    setMovies([])
+    setIndex(0)
+    const exclude = seenIdsRef.current.slice(-50)
+    moviesApi
+      .getRecommendationsExplained(exclude)
+      .then((data) => setMovies(data.recommendations || []))
+      .catch(() =>
+        moviesApi.getRecommendations().then((data) => setMovies(data.recommendations || []))
+      )
+      .finally(() => setRefreshing(false))
+  }
+
+  const next = () => {
+    if (index >= movies.length - 1) {
+      refresh()
+    } else {
+      setIndex((i) => i + 1)
+    }
+  }
   const prev = () => setIndex((i) => Math.max(i - 1, 0))
 
   const handleTouchStart = (e) => {
     touchStartY.current = e.touches[0].clientY
+    isSwiping.current = false
   }
   const handleTouchEnd = (e) => {
     if (touchStartY.current == null) return
     const dy = e.changedTouches[0].clientY - touchStartY.current
-    if (dy < -60) next()
-    else if (dy > 60) prev()
+    if (dy < -40) {
+      isSwiping.current = true
+      next()
+    } else if (dy > 40) {
+      isSwiping.current = true
+      prev()
+    }
     touchStartY.current = null
   }
 
-  const handleLike = async () => {
-    if (!movie || liked.has(movie.id)) return
-    try {
-      await reviewsApi.add({ movieId: movie.id, rating: 5, comment: 'Loved it' })
-      setLiked((s) => new Set([...s, movie.id]))
-      showToast('Liked', 'success', 1800)
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Could not like', 'error')
+  const markSeen = (id) => {
+    if (id && !seenIdsRef.current.includes(id)) {
+      seenIdsRef.current = [...seenIdsRef.current, id]
     }
   }
 
-  const handleSave = async () => {
-    if (!movie || saved.has(movie.id)) return
+  const handleLike = async () => {
+    if (!movie || liked.has(movieId)) return
+    markSeen(movieId)
     try {
-      await usersApi.addToWatchlist(movie.id)
-      setSaved((s) => new Set([...s, movie.id]))
+      await reviewsApi.add({ movieId, rating: 5, comment: 'Loved it' })
+      setLiked((s) => new Set([...s, movieId]))
+      showToast('Liked', 'success', 1800)
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Could not like', 'error')
+    } finally {
+      next()
+    }
+  }
+
+  const handleDismiss = () => {
+    markSeen(movieId)
+    next()
+  }
+
+  const handleSave = async () => {
+    if (!movie || saved.has(movieId)) return
+    try {
+      await usersApi.addToWatchlist(movieId)
+      setSaved((s) => new Set([...s, movieId]))
       showToast('Added to watchlist', 'success', 1800)
     } catch (err) {
       showToast(err.response?.data?.message || 'Already in watchlist', 'info')
@@ -83,7 +130,7 @@ export default function FeedPage() {
         })
       } catch {}
     } else {
-      navigator.clipboard?.writeText(`${movie.title} — ${window.location.origin}/movie/${movie.id}`)
+      navigator.clipboard?.writeText(`${movie.title} — ${window.location.origin}/movie/${movieId}`)
       showToast('Link copied', 'success', 1800)
     }
   }
@@ -94,7 +141,7 @@ export default function FeedPage() {
 
       <TopBar />
 
-      {loading ? (
+      {loading || refreshing ? (
         <FeedSkeleton />
       ) : !movie ? (
         <EmptyFeed />
@@ -109,11 +156,15 @@ export default function FeedPage() {
           <div
             className="relative cursor-pointer animate-fade-in"
             style={{ minHeight: 'calc(100vh - 140px)' }}
-            onClick={() => navigate(`/movie/${movie.id}`)}
+            onClick={() => {
+              if (isSwiping.current) { isSwiping.current = false; return }
+              navigate(`/movie/${movieId}`)
+            }}
           >
             <MoviePoster
               posterUrl={movie.posterUrl}
               title={movie.title}
+              size="original"
               className="absolute inset-0 w-full h-full"
             />
             {/* Gradient overlay */}
@@ -162,11 +213,20 @@ export default function FeedPage() {
               <ActionButton
                 onClick={(e) => {
                   e.stopPropagation()
+                  handleDismiss()
+                }}
+              >
+                <DismissIcon />
+                <span className="text-[10px] mt-1 text-white/80">Skip</span>
+              </ActionButton>
+              <ActionButton
+                onClick={(e) => {
+                  e.stopPropagation()
                   handleLike()
                 }}
-                active={liked.has(movie.id)}
+                active={liked.has(movieId)}
               >
-                <HeartIcon filled={liked.has(movie.id)} />
+                <HeartIcon filled={liked.has(movieId)} />
                 <span className="text-[10px] mt-1 text-white/80">Like</span>
               </ActionButton>
               <ActionButton
@@ -174,9 +234,9 @@ export default function FeedPage() {
                   e.stopPropagation()
                   handleSave()
                 }}
-                active={saved.has(movie.id)}
+                active={saved.has(movieId)}
               >
-                <BookmarkIcon filled={saved.has(movie.id)} />
+                <BookmarkIcon filled={saved.has(movieId)} />
                 <span className="text-[10px] mt-1 text-white/80">Save</span>
               </ActionButton>
               <ActionButton
@@ -187,6 +247,15 @@ export default function FeedPage() {
               >
                 <ShareIcon />
                 <span className="text-[10px] mt-1 text-white/80">Share</span>
+              </ActionButton>
+              <ActionButton
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowTrailer(true)
+                }}
+              >
+                <PlayIcon />
+                <span className="text-[10px] mt-1 text-white/80">Trailer</span>
               </ActionButton>
             </div>
           </div>
@@ -199,7 +268,24 @@ export default function FeedPage() {
       )}
 
       <BottomNav />
+
+      {showTrailer && movie && (
+        <TrailerModal
+          movieId={movie.id || movie._id}
+          movieTitle={movie.title}
+          onClose={() => setShowTrailer(false)}
+        />
+      )}
     </div>
+  )
+}
+
+function PlayIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <polygon points="10,8 16,12 10,16" fill="white" stroke="none" />
+    </svg>
   )
 }
 
@@ -216,6 +302,14 @@ function ActionButton({ children, onClick, active }) {
     >
       {children}
     </button>
+  )
+}
+
+function DismissIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+      <path d="M18 6L6 18M6 6L18 18" />
+    </svg>
   )
 }
 

@@ -1,9 +1,16 @@
 import { useState } from 'react'
 
-export default function MoviePoster({ posterUrl, title, className = '', style = {} }) {
-  const [error, setError] = useState(false)
+function resolveTmdbUrl(url, size) {
+  if (!url || !size) return url
+  // TMDB URLs look like: https://image.tmdb.org/t/p/w500/abc.jpg
+  return url.replace(/\/t\/p\/w\d+\//, `/t/p/${size}/`)
+}
 
-  if (!posterUrl || error) {
+export default function MoviePoster({ posterUrl, title, size = 'w500', className = '', style = {} }) {
+  const [error, setError] = useState(false)
+  const resolvedUrl = resolveTmdbUrl(posterUrl, size)
+
+  if (!resolvedUrl || error) {
     return (
       <div
         className={className}
@@ -23,7 +30,7 @@ export default function MoviePoster({ posterUrl, title, className = '', style = 
 
   return (
     <img
-      src={posterUrl}
+      src={resolvedUrl}
       alt={title}
       onError={() => setError(true)}
       className={className}

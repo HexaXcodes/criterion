@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { usersApi } from '../api/users'
 import { useAuth } from '../context/AuthContext'
 import { usePet } from '../context/PetContext'
-import { GENRES, timeAgo } from '../utils/helpers'
+import { GENRES, LANGUAGES, timeAgo } from '../utils/helpers'
 import GenreBackground from '../components/GenreBackground'
 import TopBar from '../components/TopBar'
 import BottomNav from '../components/BottomNav'
@@ -241,7 +241,7 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            {/* Genre preferences */}
+            {/* Genre + language preferences */}
             <div className="glass rounded-2xl p-5 mb-5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-text-muted text-xs font-bold tracking-widest uppercase">
@@ -254,7 +254,9 @@ export default function ProfilePage() {
                   Edit
                 </button>
               </div>
-              <div className="flex flex-wrap gap-2">
+
+              <p className="text-text-muted text-xs tracking-widest mb-2 uppercase">Genres</p>
+              <div className="flex flex-wrap gap-2 mb-4">
                 {(profile?.preferences?.genres || []).length === 0 ? (
                   <span className="text-text-muted text-sm">No genres set</span>
                 ) : (
@@ -262,6 +264,27 @@ export default function ProfilePage() {
                     <span key={g} className="chip-genre">{g}</span>
                   ))
                 )}
+              </div>
+
+              <p className="text-text-muted text-xs tracking-widest mb-2 uppercase">Languages</p>
+              <div className="flex flex-wrap gap-2">
+                {(profile?.preferences?.languages || ['en']).map((code) => {
+                  const lang = LANGUAGES.find((l) => l.code === code)
+                  return (
+                    <span
+                      key={code}
+                      className="px-3 py-1 rounded-full text-xs font-semibold"
+                      style={{
+                        background: 'rgba(0,219,233,0.1)',
+                        border: '1px solid rgba(0,219,233,0.3)',
+                        color: '#00dbe9',
+                        fontFamily: 'Space Grotesk',
+                      }}
+                    >
+                      {lang?.label || code}
+                    </span>
+                  )
+                })}
               </div>
             </div>
 
@@ -298,11 +321,12 @@ export default function ProfilePage() {
       {showPrefs && (
         <EditPreferencesModal
           currentGenres={profile?.preferences?.genres || []}
+          currentLanguages={profile?.preferences?.languages || ['en']}
           onClose={() => setShowPrefs(false)}
-          onSaved={(genres) => {
+          onSaved={({ genres, languages }) => {
             setProfile((p) => ({
               ...p,
-              preferences: { ...p?.preferences, genres },
+              preferences: { ...p?.preferences, genres, languages },
             }))
             setShowPrefs(false)
           }}
@@ -329,24 +353,30 @@ function SettingsRow({ icon, label, onClick }) {
   )
 }
 
-function EditPreferencesModal({ currentGenres, onClose, onSaved }) {
+function EditPreferencesModal({ currentGenres, currentLanguages, onClose, onSaved }) {
   const { showToast } = useAuth()
-  const [selected, setSelected] = useState([...currentGenres])
+  const [selectedGenres, setSelectedGenres] = useState([...currentGenres])
+  const [selectedLangs, setSelectedLangs] = useState([...(currentLanguages || ['en'])])
   const [saving, setSaving] = useState(false)
 
-  const toggle = (g) =>
-    setSelected((s) => (s.includes(g) ? s.filter((x) => x !== g) : [...s, g]))
+  const toggleGenre = (g) =>
+    setSelectedGenres((s) => (s.includes(g) ? s.filter((x) => x !== g) : [...s, g]))
+
+  const toggleLang = (code) =>
+    setSelectedLangs((s) =>
+      s.includes(code) ? (s.length > 1 ? s.filter((x) => x !== code) : s) : [...s, code]
+    )
 
   const handleSave = async () => {
-    if (selected.length === 0) {
+    if (selectedGenres.length === 0) {
       showToast('Pick at least one genre', 'error')
       return
     }
     setSaving(true)
     try {
-      await usersApi.updatePreferences({ genres: selected, favoriteActors: [] })
+      await usersApi.updatePreferences({ genres: selectedGenres, languages: selectedLangs, favoriteActors: [] })
       showToast('Preferences saved', 'success')
-      onSaved(selected)
+      onSaved({ genres: selectedGenres, languages: selectedLangs })
     } catch (err) {
       showToast('Could not save', 'error')
     } finally {
@@ -363,19 +393,48 @@ function EditPreferencesModal({ currentGenres, onClose, onSaved }) {
       <div
         onClick={(e) => e.stopPropagation()}
         className="glass-strong w-full max-w-md rounded-3xl p-6 animate-slide-up"
+        style={{ maxHeight: '85vh', overflowY: 'auto' }}
       >
         <h2 className="display-glow text-2xl mb-2">Edit Preferences</h2>
-        <p className="text-text-secondary text-sm mb-4">Select genres you love</p>
-        <div className="flex flex-wrap gap-2 mb-6">
+
+        <p className="text-text-muted text-xs tracking-widest font-bold mb-2 mt-4 uppercase">Genres</p>
+        <div className="flex flex-wrap gap-2 mb-5">
           {GENRES.map((g) => (
             <button
               key={g}
-              onClick={() => toggle(g)}
-              className={`chip-genre transition ${selected.includes(g) ? 'active' : ''}`}
+              onClick={() => toggleGenre(g)}
+              className={`chip-genre transition ${selectedGenres.includes(g) ? 'active' : ''}`}
             >
               {g}
             </button>
           ))}
+        </div>
+
+        <p className="text-text-muted text-xs tracking-widest font-bold mb-2 uppercase">Preferred Languages</p>
+        <p className="text-text-muted text-xs mb-3">Films in these languages appear first. Keep at least one.</p>
+        <div className="flex flex-wrap gap-2 mb-6">
+          {LANGUAGES.map(({ code, label }) => {
+            const active = selectedLangs.includes(code)
+            return (
+              <button
+                key={code}
+                onClick={() => toggleLang(code)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 99,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  fontFamily: 'Space Grotesk',
+                  cursor: 'pointer',
+                  background: active ? 'rgba(0,219,233,0.15)' : 'rgba(255,255,255,0.05)',
+                  border: active ? '1px solid rgba(0,219,233,0.5)' : '1px solid rgba(255,255,255,0.1)',
+                  color: active ? '#00dbe9' : '#9a9a9a',
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
         </div>
         <div className="flex gap-2">
           <button onClick={onClose} className="btn-secondary flex-1 text-sm">

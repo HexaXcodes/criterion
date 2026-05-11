@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(localStorage.getItem('token'))
   const [loading, setLoading] = useState(true)
   const [toasts, setToasts] = useState([])
+  const [authGate, setAuthGate] = useState(null) // { action: string } | null
 
   // Hydrate user on app load
   useEffect(() => {
@@ -26,6 +27,9 @@ export function AuthProvider({ children }) {
       setLoading(false)
     }
   }, [])
+
+  const showAuthGate = useCallback((action = 'do this') => setAuthGate({ action }), [])
+  const hideAuthGate = useCallback(() => setAuthGate(null), [])
 
   const showToast = useCallback((message, variant = 'info', duration = 3500) => {
     const id = Date.now() + Math.random()
@@ -98,6 +102,9 @@ export function AuthProvider({ children }) {
     setUser,
     toasts,
     showToast,
+    authGate,
+    showAuthGate,
+    hideAuthGate,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

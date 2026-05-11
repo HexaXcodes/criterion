@@ -4,6 +4,7 @@ import { PetProvider } from './context/PetContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import PetCompanion from './components/PetCompanion'
 import ToastStack from './components/ToastStack'
+import AuthGateModal from './components/AuthGateModal'
 
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
@@ -32,6 +33,7 @@ function AppShell() {
     <>
       {isAuthenticated && <PetCompanion />}
       <ToastStack />
+      <AuthGateModal />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />

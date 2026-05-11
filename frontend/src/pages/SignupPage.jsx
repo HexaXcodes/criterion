@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePet } from '../context/PetContext'
 import { usersApi } from '../api/users'
-import { GENRES } from '../utils/helpers'
+import { GENRES, LANGUAGES } from '../utils/helpers'
 import MimiPet from '../components/pets/MimiPet'
 import JeebiePet from '../components/pets/JeebiePet'
 import ToffeePet from '../components/pets/ToffeePet'
@@ -33,6 +33,9 @@ export default function SignupPage() {
   const [genres, setGenres] = useState([])
 
   // Step 3
+  const [languages, setLanguages] = useState(['en'])
+
+  // Step 4
   const [selectedPet, setSelectedPet] = useState('mimi')
   const [petCustomName, setPetCustomName] = useState('')
 
@@ -59,15 +62,25 @@ export default function SignupPage() {
     setGenres((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]))
   }
 
+  const toggleLanguage = (code) => {
+    setLanguages((prev) =>
+      prev.includes(code) ? (prev.length > 1 ? prev.filter((x) => x !== code) : prev) : [...prev, code]
+    )
+  }
+
   const handleStep2 = async () => {
     if (genres.length === 0) {
       showToast('Pick at least one genre', 'error')
       return
     }
+    setStep(3)
+  }
+
+  const handleStep3 = async () => {
     setLoading(true)
     try {
-      await usersApi.updatePreferences({ genres, favoriteActors: [] })
-      setStep(3)
+      await usersApi.updatePreferences({ genres, languages, favoriteActors: [] })
+      setStep(4)
     } catch (err) {
       showToast('Could not save preferences', 'error')
     } finally {
@@ -121,7 +134,11 @@ export default function SignupPage() {
         )}
 
         {step === 3 && (
-          <Step3
+          <Step3 languages={languages} toggleLanguage={toggleLanguage} onNext={handleStep3} loading={loading} />
+        )}
+
+        {step === 4 && (
+          <Step4
             selectedPet={selectedPet}
             setSelectedPet={setSelectedPet}
             petCustomName={petCustomName}
@@ -137,7 +154,7 @@ export default function SignupPage() {
 function ProgressDots({ step }) {
   return (
     <div className="flex items-center gap-2">
-      {[1, 2, 3].map((n) => (
+      {[1, 2, 3, 4].map((n) => (
         <div
           key={n}
           className="rounded-full transition-all"
@@ -202,7 +219,7 @@ function Step2({ genres, toggleGenre, onNext, loading }) {
   return (
     <>
       <h1 className="display-glow text-3xl mb-2 mt-4">What do you love watching?</h1>
-      <p className="text-text-secondary text-sm mb-8">Step 2 of 3 — pick your genres</p>
+      <p className="text-text-secondary text-sm mb-8">Step 2 of 4 — pick your genres</p>
 
       <div className="flex flex-wrap gap-2 mb-8">
         {GENRES.map((g) => (
@@ -224,11 +241,52 @@ function Step2({ genres, toggleGenre, onNext, loading }) {
   )
 }
 
-function Step3({ selectedPet, setSelectedPet, petCustomName, setPetCustomName, onFinish }) {
+function Step3({ languages, toggleLanguage, onNext, loading }) {
+  return (
+    <>
+      <h1 className="display-glow text-3xl mb-2 mt-4">What languages do you prefer?</h1>
+      <p className="text-text-secondary text-sm mb-2">Step 3 of 4 — we'll show these films first</p>
+      <p className="text-text-muted text-xs mb-8">You can always change this in your profile. Hold at least one selected.</p>
+
+      <div className="flex flex-wrap gap-2 mb-8">
+        {LANGUAGES.map(({ code, label }) => {
+          const active = languages.includes(code)
+          return (
+            <button
+              key={code}
+              onClick={() => toggleLanguage(code)}
+              className="transition"
+              style={{
+                padding: '8px 16px',
+                borderRadius: 99,
+                fontSize: 13,
+                fontWeight: 600,
+                fontFamily: 'Space Grotesk',
+                cursor: 'pointer',
+                background: active ? 'linear-gradient(135deg,#ff4b89,#ff2070)' : 'rgba(255,255,255,0.05)',
+                border: active ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                color: active ? '#fff' : '#e2e2e2',
+                boxShadow: active ? '0 0 16px rgba(255,75,137,0.35)' : 'none',
+              }}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </div>
+
+      <button onClick={onNext} disabled={loading} className="btn-primary w-full text-base disabled:opacity-50">
+        {loading ? 'Saving...' : `Continue (${languages.length} selected)`}
+      </button>
+    </>
+  )
+}
+
+function Step4({ selectedPet, setSelectedPet, petCustomName, setPetCustomName, onFinish }) {
   return (
     <>
       <h1 className="display-glow text-3xl mb-2 mt-4">Pick your Criterion companion</h1>
-      <p className="text-text-secondary text-sm mb-6">Step 3 of 3 — they'll follow you everywhere</p>
+      <p className="text-text-secondary text-sm mb-6">Step 4 of 4 — they'll follow you everywhere</p>
 
       <div className="grid grid-cols-2 gap-3 mb-6">
         {COMPANIONS.map((pet) => {

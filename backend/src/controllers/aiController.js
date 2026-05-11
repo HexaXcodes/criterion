@@ -193,6 +193,44 @@ exports.autoPopulateWatchlist = async (userId) => {
   }
 };
 
+// Fall back to top-rated DB movies shaped like ML recommendations
+const getFallbackMovies = async (preferredGenres, watchedIds, limit = 5) => {
+  const filter = {};
+  if (preferredGenres && preferredGenres.length > 0) {
+    filter.genre = { $in: preferredGenres };
+  }
+  if (watchedIds && watchedIds.length > 0) {
+    filter._id = { $nin: watchedIds };
+  }
+
+  let movies = await Movie.find(filter)
+    .sort({ averageRating: -1 })
+    .limit(limit)
+    .lean();
+
+  // If genre filter returned too few, top up with any top-rated movies
+  if (movies.length < limit) {
+    const seenIds = movies.map(m => m._id.toString());
+    const extra = await Movie.find({ _id: { $nin: [...(watchedIds || []), ...seenIds] } })
+      .sort({ averageRating: -1 })
+      .limit(limit - movies.length)
+      .lean();
+    movies = [...movies, ...extra];
+  }
+
+  return movies.map(m => ({
+    id: m._id.toString(),
+    _id: m._id.toString(),
+    title: m.title,
+    genre: m.genre || [],
+    posterUrl: m.posterUrl,
+    averageRating: m.averageRating,
+    description: m.description,
+    releaseYear: m.releaseYear,
+    similarityScore: 0.7
+  }));
+};
+
 // Get full recommendations with rich, personalized AI explanations
 exports.getRecommendationsWithExplanations = async (req, res) => {
   try {
@@ -205,25 +243,31 @@ exports.getRecommendationsWithExplanations = async (req, res) => {
     }).populate("movie", "genre title");
 
     const profile = buildUserProfile(user, highRatedReviews);
+    const excludeParam = req.query.exclude ? req.query.exclude.split(',').filter(Boolean) : []
+    const watchedIds = [...new Set([
+      ...user.watchedMovies.map(id => id.toString()),
+      ...excludeParam
+    ])]
 
-    const watchedIds = user.watchedMovies.map(id => id.toString());
-
-    const result = await getMLRecommendations(
-      user.preferences.genres,
-      watchedIds,
-      profile.likedGenres
-    );
-
-    if (!result.recommendations) {
-      return res.status(500).json({ message: "ML service unavailable" });
+    let recommendations;
+    try {
+      const result = await getMLRecommendations(
+        user.preferences.genres,
+        watchedIds,
+        profile.likedGenres
+      );
+      recommendations = result.recommendations && result.recommendations.length > 0
+        ? result.recommendations.slice(0, 5)
+        : await getFallbackMovies(user.preferences.genres, watchedIds);
+    } catch {
+      recommendations = await getFallbackMovies(user.preferences.genres, watchedIds);
     }
 
-    const recommendations = result.recommendations.slice(0, 5);
     const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const recommendationsWithExplanations = await Promise.all(
       recommendations.map(async (movie) => {
-        const movieDoc = await Movie.findById(movie.id)
+        const movieDoc = await Movie.findById(movie.id || movie._id)
           .select("description releaseYear")
           .lean()
           .catch(() => null);
@@ -234,9 +278,12 @@ exports.getRecommendationsWithExplanations = async (req, res) => {
           );
           return { ...movie, explanation };
         } catch {
+          const genres = Array.isArray(movie.genre) ? movie.genre : [];
           return {
             ...movie,
-            explanation: `A strong pick for your taste in ${movie.genre.join(" and ")} films.`
+            explanation: genres.length > 0
+              ? `A strong pick for your taste in ${genres.join(" and ")} films.`
+              : `A top-rated pick we think you'll enjoy.`
           };
         }
       })

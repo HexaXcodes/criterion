@@ -1,14 +1,41 @@
+export const LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'hi', label: 'Hindi' },
+  { code: 'ko', label: 'Korean' },
+  { code: 'ja', label: 'Japanese' },
+  { code: 'zh', label: 'Chinese' },
+  { code: 'fr', label: 'French' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'de', label: 'German' },
+  { code: 'it', label: 'Italian' },
+  { code: 'pt', label: 'Portuguese' },
+  { code: 'ru', label: 'Russian' },
+  { code: 'ar', label: 'Arabic' },
+  { code: 'ta', label: 'Tamil' },
+  { code: 'te', label: 'Telugu' },
+  { code: 'th', label: 'Thai' },
+]
+
 // Map a genre string to its background CSS class name
 export const GENRES = [
   'Action',
+  'Adventure',
+  'Animation',
+  'Comedy',
+  'Crime',
+  'Documentary',
   'Drama',
+  'Family',
+  'Fantasy',
+  'History',
+  'Horror',
+  'Music',
+  'Mystery',
+  'Romance',
   'Sci-Fi',
   'Thriller',
-  'Horror',
-  'Comedy',
-  'Romance',
-  'Animation',
-  'Documentary',
+  'War',
+  'Western',
 ]
 
 export function genreToBgClass(genre) {
@@ -22,7 +49,9 @@ export function genreToBgClass(genre) {
   if (g.includes('comedy')) return 'bg-comedy'
   if (g.includes('drama')) return 'bg-drama'
   if (g.includes('animation')) return 'bg-animation'
-  if (g.includes('documentary')) return 'bg-comedy' // shares lime palette
+  if (g.includes('documentary') || g.includes('history') || g.includes('music')) return 'bg-comedy'
+  if (g.includes('crime') || g.includes('mystery') || g.includes('war') || g.includes('western')) return 'bg-thriller'
+  if (g.includes('adventure') || g.includes('fantasy') || g.includes('family')) return 'bg-action'
   return 'bg-default'
 }
 

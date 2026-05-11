@@ -1,31 +1,36 @@
 const User = require("../models/User");
+const Review = require("../models/Review");
 
 // Get user profile
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id)
-      .select("-password")
-      .populate("watchedMovies", "title genre posterUrl averageRating")
-      .populate("watchlist", "title genre posterUrl averageRating");
+    const [user, reviewCount] = await Promise.all([
+      User.findById(req.user.id)
+        .select("-password")
+        .populate("watchedMovies", "title genre posterUrl averageRating")
+        .populate("watchlist", "title genre posterUrl averageRating"),
+      Review.countDocuments({ user: req.user.id })
+    ]);
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.json(user);
+    res.json({ ...user.toObject(), reviewCount });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Update preferences (genres, actors)
+// Update preferences (genres, languages, actors)
 exports.updatePreferences = async (req, res) => {
   try {
-    const { genres, favoriteActors } = req.body;
+    const { genres, languages, favoriteActors } = req.body;
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
       {
         preferences: {
           genres: genres || [],
+          languages: languages || ['en'],
           favoriteActors: favoriteActors || []
         }
       },
@@ -95,6 +100,7 @@ exports.getLeaderboard = async (req, res) => {
       .limit(10);
 
     const leaderboard = users.map((user, index) => ({
+      _id: user._id,
       rank: index + 1,
       name: user.name,
       points: user.points,
