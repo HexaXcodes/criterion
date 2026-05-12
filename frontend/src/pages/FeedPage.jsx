@@ -154,7 +154,7 @@ export default function FeedPage() {
         >
           {/* Full-bleed poster */}
           <div
-            className="relative cursor-pointer animate-fade-in"
+            className="relative cursor-pointer animate-fade-in peekable-card"
             style={{ minHeight: 'calc(100vh - 140px)' }}
             onClick={() => {
               if (isSwiping.current) { isSwiping.current = false; return }

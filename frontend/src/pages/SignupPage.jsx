@@ -8,12 +8,20 @@ import MimiPet from '../components/pets/MimiPet'
 import JeebiePet from '../components/pets/JeebiePet'
 import ToffeePet from '../components/pets/ToffeePet'
 import BiscuitPet from '../components/pets/BiscuitPet'
+import MochiPet from '../components/pets/MochiPet'
+import PuddingPet from '../components/pets/PuddingPet'
+import PepperPet from '../components/pets/PepperPet'
+import CocoPet from '../components/pets/CocoPet'
 
 const COMPANIONS = [
   { id: 'mimi', name: 'Mimi', tag: 'DREAMER', component: MimiPet, color: '#ff4b89' },
   { id: 'jeebie', name: 'Jeebie', tag: 'CHAOTIC', component: JeebiePet, color: '#ff8c40' },
   { id: 'toffee', name: 'Toffee', tag: 'SOPHISTICATED', component: ToffeePet, color: '#4aaa60' },
   { id: 'biscuit', name: 'Biscuit', tag: 'LOYAL', component: BiscuitPet, color: '#ffaa44' },
+  { id: 'mochi', name: 'Mochi', tag: 'BOUNCY', component: MochiPet, color: '#ffb1c3' },
+  { id: 'pudding', name: 'Pudding', tag: 'CHUBBY', component: PuddingPet, color: '#f0d9a0' },
+  { id: 'pepper', name: 'Pepper', tag: 'DREAMY', component: PepperPet, color: '#00dbe9' },
+  { id: 'coco', name: 'Coco', tag: 'COSY', component: CocoPet, color: '#ffd700' },
 ]
 
 export default function SignupPage() {
@@ -288,7 +296,10 @@ function Step4({ selectedPet, setSelectedPet, petCustomName, setPetCustomName, o
       <h1 className="display-glow text-3xl mb-2 mt-4">Pick your Criterion companion</h1>
       <p className="text-text-secondary text-sm mb-6">Step 4 of 4 — they'll follow you everywhere</p>
 
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div
+        className="grid grid-cols-2 gap-3 mb-6 scroll-x"
+        style={{ maxHeight: 520, overflowY: 'auto', paddingRight: 4 }}
+      >
         {COMPANIONS.map((pet) => {
           const PetSvg = pet.component
           const isSelected = selectedPet === pet.id
@@ -300,16 +311,16 @@ function Step4({ selectedPet, setSelectedPet, petCustomName, setPetCustomName, o
               style={{
                 background: isSelected ? 'rgba(255, 75, 137, 0.08)' : 'rgba(255, 255, 255, 0.03)',
                 border: isSelected
-                  ? '2px solid #ff4b89'
+                  ? `2px solid ${pet.color}`
                   : '1px solid rgba(255, 255, 255, 0.08)',
-                boxShadow: isSelected ? '0 0 30px rgba(255, 75, 137, 0.4)' : 'none',
+                boxShadow: isSelected ? `0 0 30px ${pet.color}55` : 'none',
               }}
             >
               <div className="flex justify-center mb-2">
-                <PetSvg size={70} />
+                <PetSvg size={64} />
               </div>
               <div className="text-center">
-                <div className="text-text-primary font-bold text-lg" style={{ fontFamily: 'Space Grotesk' }}>
+                <div className="text-text-primary font-bold text-base" style={{ fontFamily: 'Space Grotesk' }}>
                   {pet.name}
                 </div>
                 <div className="chip-pink text-[10px] inline-block mt-1">{pet.tag}</div>

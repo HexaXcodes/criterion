@@ -394,7 +394,7 @@ function PosterCard({ movie, navigate, compact, explained, mini }) {
   return (
     <button
       onClick={() => navigate(`/movie/${id}`)}
-      className="text-left rounded-xl overflow-hidden glass relative active:scale-95 transition flex-shrink-0"
+      className="peekable-card text-left rounded-xl overflow-hidden glass relative active:scale-95 transition flex-shrink-0"
       style={{ width: compact ? 140 : '100%' }}
     >
       <div className="relative">

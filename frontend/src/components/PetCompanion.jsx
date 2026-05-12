@@ -1,306 +1,547 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { usePet } from '../context/PetContext'
 import MimiPet from './pets/MimiPet'
 import JeebiePet from './pets/JeebiePet'
 import ToffeePet from './pets/ToffeePet'
 import BiscuitPet from './pets/BiscuitPet'
+import MochiPet from './pets/MochiPet'
+import PuddingPet from './pets/PuddingPet'
+import PepperPet from './pets/PepperPet'
+import CocoPet from './pets/CocoPet'
 
 const PET_COMPONENTS = {
   mimi: MimiPet,
   jeebie: JeebiePet,
   toffee: ToffeePet,
   biscuit: BiscuitPet,
+  mochi: MochiPet,
+  pudding: PuddingPet,
+  pepper: PepperPet,
+  coco: CocoPet,
 }
 
-const PET_BEHAVIOURS = {
-  mimi:    { speed: 0.04, pauseChance: 0.008, idleSleepMs: 12000 },
-  jeebie:  { speed: 0.08, pauseChance: 0.004, idleSleepMs: null },
-  toffee:  { speed: 0.03, pauseChance: 0.014, idleSleepMs: null, edgePreference: true },
-  biscuit: { speed: 0.10, pauseChance: 0.002, idleSleepMs: null },
+// Safe zones: bottom strip and side corridors
+// x: 0–8% (left) or 92–100% (right); y: 82–91%
+// Returns a random target in a safe zone
+function randomSafeTarget(petType, prevX) {
+  const zone = Math.random()
+  let x, y
+
+  if (petType === 'toffee') {
+    // Prefers edges
+    x = Math.random() > 0.5 ? 4 + Math.random() * 6 : 90 + Math.random() * 6
+    y = 83 + Math.random() * 7
+  } else if (zone < 0.15) {
+    // Left corridor
+    x = 1 + Math.random() * 7
+    y = 83 + Math.random() * 7
+  } else if (zone < 0.3) {
+    // Right corridor
+    x = 92 + Math.random() * 6
+    y = 83 + Math.random() * 7
+  } else {
+    // Bottom strip
+    x = 8 + Math.random() * 84
+    y = 83 + Math.random() * 7
+  }
+
+  return { x: Math.max(1, Math.min(97, x)), y: Math.max(82, Math.min(91, y)) }
 }
 
-// Per-pet random 3D motions mimicking personality
-const PET_MOTIONS = {
-  biscuit: [
-    { anim: 'petBounce',  duration: 900 },
-    { anim: 'petZoomies', duration: 1400 },
-    { anim: 'petWiggle',  duration: 700 },
-    { anim: 'petBounce',  duration: 700 },
-  ],
-  jeebie: [
-    { anim: 'petDart',   duration: 500 },
-    { anim: 'petPounce', duration: 900 },
-    { anim: 'petWiggle', duration: 500 },
-    { anim: 'petDart',   duration: 400 },
-  ],
-  toffee: [
-    { anim: 'petGroom',   duration: 2000 },
-    { anim: 'petTilt',    duration: 1800 },
-    { anim: 'petStretch', duration: 1600 },
-  ],
-  mimi: [
-    { anim: 'petSway', duration: 2800 },
-    { anim: 'petTilt', duration: 2000 },
-    { anim: 'petSway', duration: 3200 },
-  ],
+// Per-pet speed (px per viewport-% per frame)
+const PET_SPEED = {
+  mimi:    { base: 0.35, variance: 0.25 },
+  jeebie:  { base: 1.2,  variance: 0.8 },
+  toffee:  { base: 0.5,  variance: 0.2 },
+  biscuit: { base: 1.6,  variance: 0.9 },
+  mochi:   { base: 0.0,  variance: 0.0 }, // hop-based, handled separately
+  pudding: { base: 0.55, variance: 0.25 },
+  pepper:  { base: 0.25, variance: 0.15 },
+  coco:    { base: 0.6,  variance: 0.3 },
 }
 
-const PET_ANIM_CSS = `
-  @keyframes petBounce {
-    0%,100% { transform: translateY(0)    rotateX(0deg); }
-    20%     { transform: translateY(-14px) rotateX(-12deg); }
-    40%     { transform: translateY(0)    rotateX(6deg); }
-    60%     { transform: translateY(-7px)  rotateX(-6deg); }
-    80%     { transform: translateY(0)    rotateX(2deg); }
-  }
-  @keyframes petZoomies {
-    0%,100% { transform: rotateY(0deg)   rotateZ(0deg)   translateY(0); }
-    12%     { transform: rotateY(-30deg) rotateZ(-10deg) translateY(-5px); }
-    25%     { transform: rotateY(30deg)  rotateZ(10deg)  translateY(-5px); }
-    38%     { transform: rotateY(-25deg) rotateZ(-7deg)  translateY(-3px); }
-    50%     { transform: rotateY(25deg)  rotateZ(7deg)   translateY(-3px); }
-    65%     { transform: rotateY(-15deg) rotateZ(-4deg)  translateY(-1px); }
-    80%     { transform: rotateY(10deg)  rotateZ(3deg); }
-  }
-  @keyframes petWiggle {
-    0%,100% { transform: rotateZ(0deg); }
-    20%     { transform: rotateZ(-14deg); }
-    40%     { transform: rotateZ(14deg); }
-    60%     { transform: rotateZ(-9deg); }
-    80%     { transform: rotateZ(9deg); }
-  }
-  @keyframes petDart {
-    0%,100% { transform: rotateY(0deg)   scaleX(1); }
-    25%     { transform: rotateY(-35deg) scaleX(1.12); }
-    55%     { transform: rotateY(22deg)  scaleX(0.95); }
-    75%     { transform: rotateY(-10deg) scaleX(1.05); }
-  }
-  @keyframes petPounce {
-    0%,100% { transform: translateY(0)    rotateX(0deg)   scaleY(1); }
-    20%     { transform: translateY(5px)  rotateX(18deg)  scaleY(0.88); }
-    45%     { transform: translateY(-16px) rotateX(-16deg) scaleY(1.1); }
-    65%     { transform: translateY(-4px) rotateX(-6deg)  scaleY(1.02); }
-    82%     { transform: translateY(2px)  rotateX(4deg)   scaleY(0.96); }
-  }
-  @keyframes petGroom {
-    0%,100% { transform: rotateX(0deg)  rotateZ(0deg); }
-    25%     { transform: rotateX(28deg) rotateZ(-3deg); }
-    55%     { transform: rotateX(22deg) rotateZ(2deg); }
-    78%     { transform: rotateX(6deg)  rotateZ(0deg); }
-  }
-  @keyframes petTilt {
-    0%,100% { transform: rotateZ(0deg); }
-    25%     { transform: rotateZ(18deg); }
-    55%     { transform: rotateZ(18deg); }
-    80%     { transform: rotateZ(4deg); }
-  }
-  @keyframes petStretch {
-    0%,100% { transform: scaleY(1)    rotateX(0deg); }
-    25%     { transform: scaleY(1.12) rotateX(-12deg); }
-    55%     { transform: scaleY(1.08) rotateX(-8deg); }
-    80%     { transform: scaleY(0.96) rotateX(4deg); }
-  }
-  @keyframes petSway {
-    0%,100% { transform: rotateZ(0deg)   translateX(0); }
-    25%     { transform: rotateZ(10deg)  translateX(4px); }
-    75%     { transform: rotateZ(-10deg) translateX(-4px); }
-  }
-`
+// Behaviour loop intervals
+const PET_BEHAVIOUR_INTERVAL = {
+  mimi:    [6000, 14000],
+  jeebie:  [4000, 8000],
+  toffee:  [8000, 16000],
+  biscuit: [3000, 7000],
+  mochi:   [500,  500],  // hop interval
+  pudding: [3000, 8000],
+  pepper:  [5000, 8000],
+  coco:    [6000, 12000],
+}
+
+// Animation class name → CSS class (defined in index.css)
+const ANIM_CLASSES = {
+  mimiFloat:     'pet-anim-mimi-float',
+  mimiSleep:     'pet-anim-mimi-sleep',
+  jeebieVibrate: 'pet-anim-jeebie-vibrate',
+  jeebieSpin:    'pet-anim-jeebie-spin',
+  jeebiePounce:  'pet-anim-jeebie-pounce',
+  toffeeTilt:    'pet-anim-toffee-tilt',
+  biscuitBounce: 'pet-anim-biscuit-bounce',
+  biscuitWiggle: 'pet-anim-biscuit-wiggle',
+  mochiHop:      'pet-anim-mochi-hop',
+  puddingJiggle: 'pet-anim-pudding-jiggle',
+  puddingSpin:   'pet-anim-pudding-spin',
+  pepperBlink:   'pet-anim-pepper-blink',
+  cocoRock:      'pet-anim-coco-rock',
+  cocoWave:      'pet-anim-coco-wave',
+  peekOver:      'pet-anim-peek',
+  petBreathe:    'pet-anim-breathe',
+}
 
 export default function PetCompanion() {
   const { petType, petName } = usePet()
-  const [pos, setPos] = useState({ x: 12, y: 84 })
-  const [facingLeft, setFacingLeft] = useState(false)
+
+  const [pos, setPos] = useState({ x: 12, y: 85 })
+  const [facing, setFacing] = useState('right')
   const [petState, setPetState] = useState('idle')
+  const [animClass, setAnimClass] = useState('pet-anim-breathe')
   const [showTooltip, setShowTooltip] = useState(false)
   const [scrolling, setScrolling] = useState(false)
-  const [motionAnim, setMotionAnim] = useState(null)
-  const [motionDuration, setMotionDuration] = useState(1000)
+  const [isPeeking, setIsPeeking] = useState(false)
 
-  const targetRef = useRef({ x: 12, y: 84 })
-  const velocityRef = useRef({ x: 0, y: 0 })
-  const lastInteractionRef = useRef(Date.now())
+  const posRef = useRef({ x: 12, y: 85 })
+  const velRef = useRef({ x: 0, y: 0 })
+  const targetRef = useRef({ x: 12, y: 85 })
+  const facingRef = useRef('right')
+  const petStateRef = useRef('idle')
+  const isPeekingRef = useRef(false)
+  const isFrozenRef = useRef(false) // for Mochi scroll-freeze
+  const lastIdleRef = useRef(Date.now())
+
+  const rafRef = useRef(null)
+  const behaviourTimerRef = useRef(null)
+  const peekTimerRef = useRef(null)
   const tooltipTimerRef = useRef(null)
   const scrollTimerRef = useRef(null)
-  const motionTimerRef = useRef(null)
+  const animTimerRef = useRef(null)
 
   const PetComponent = PET_COMPONENTS[petType] || MimiPet
-  const behaviour = PET_BEHAVIOURS[petType] || PET_BEHAVIOURS.mimi
 
-  // Movement loop
+  // ── Movement loop (spring physics) ──────────────────────────────────────
   useEffect(() => {
-    let raf
-    let lastTargetUpdate = 0
+    const isMochi = petType === 'mochi'
+    let hopTimer = null
+    let hopStep = 0
 
-    const loop = (timestamp) => {
-      if (timestamp - lastTargetUpdate > 3000 && Math.random() > behaviour.pauseChance * 100) {
-        if (behaviour.edgePreference) {
-          targetRef.current.x = Math.random() > 0.5 ? 6 + Math.random() * 12 : 80 + Math.random() * 12
-        } else {
-          targetRef.current.x = 8 + Math.random() * 84
-        }
-        targetRef.current.y = 82 + Math.random() * 6
-        lastTargetUpdate = timestamp
+    const loop = () => {
+      if (isFrozenRef.current) {
+        rafRef.current = requestAnimationFrame(loop)
+        return
       }
 
-      setPos((prev) => {
-        const dx = targetRef.current.x - prev.x
-        const dy = targetRef.current.y - prev.y
-        velocityRef.current.x = velocityRef.current.x * 0.85 + dx * (behaviour.speed * 0.5)
-        velocityRef.current.y = velocityRef.current.y * 0.85 + dy * (behaviour.speed * 0.5)
-        const newX = Math.max(4, Math.min(94, prev.x + velocityRef.current.x))
-        const newY = Math.max(80, Math.min(91, prev.y + velocityRef.current.y))
+      if (isMochi) {
+        // Hop-based movement
+        rafRef.current = requestAnimationFrame(loop)
+        return
+      }
 
-        if (Math.abs(velocityRef.current.x) > 0.05) {
-          setFacingLeft((curr) => {
-            const wantLeft = velocityRef.current.x < 0
-            return wantLeft !== curr ? wantLeft : curr
-          })
+      const spd = PET_SPEED[petType] || PET_SPEED.mimi
+      const speed = spd.base + Math.random() * 0.02 * spd.variance
+
+      const dx = targetRef.current.x - posRef.current.x
+      const dy = targetRef.current.y - posRef.current.y
+
+      velRef.current.x = velRef.current.x * 0.82 + dx * 0.018 * speed * 3
+      velRef.current.y = velRef.current.y * 0.82 + dy * 0.018 * speed * 3
+
+      const newX = Math.max(1, Math.min(97, posRef.current.x + velRef.current.x))
+      const newY = isPeekingRef.current
+        ? posRef.current.y + velRef.current.y
+        : Math.max(82, Math.min(91, posRef.current.y + velRef.current.y))
+
+      posRef.current = { x: newX, y: newY }
+
+      if (Math.abs(velRef.current.x) > 0.05) {
+        const wantLeft = velRef.current.x < -0.05
+        if (wantLeft !== (facingRef.current === 'left')) {
+          facingRef.current = wantLeft ? 'left' : 'right'
+          setFacing(facingRef.current)
+        }
+      }
+
+      setPos({ x: newX, y: newY })
+      rafRef.current = requestAnimationFrame(loop)
+    }
+
+    // Mochi hop loop
+    const mochiHop = () => {
+      if (isFrozenRef.current || isPeekingRef.current) {
+        hopTimer = setTimeout(mochiHop, 500)
+        return
+      }
+
+      const dx = targetRef.current.x - posRef.current.x
+      const dy = targetRef.current.y - posRef.current.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+
+      if (dist > 0.5) {
+        const step = Math.min(dist, 8 + Math.random() * 6)
+        const nx = posRef.current.x + (dx / dist) * step
+        const ny = Math.max(82, Math.min(91, posRef.current.y + (dy / dist) * step))
+        posRef.current = { x: nx, y: ny }
+        setPos({ x: nx, y: ny })
+
+        const wantLeft = dx < 0
+        if (wantLeft !== (facingRef.current === 'left')) {
+          facingRef.current = wantLeft ? 'left' : 'right'
+          setFacing(facingRef.current)
         }
 
-        return { x: newX, y: newY }
-      })
-
-      raf = requestAnimationFrame(loop)
+        setAnimClass('pet-anim-mochi-hop')
+        hopTimer = setTimeout(() => {
+          setAnimClass('pet-anim-breathe')
+          hopTimer = setTimeout(mochiHop, 100)
+        }, 380)
+      } else {
+        hopTimer = setTimeout(mochiHop, 500)
+      }
     }
 
-    raf = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(raf)
-  }, [petType, behaviour])
+    if (isMochi) {
+      mochiHop()
+    } else {
+      rafRef.current = requestAnimationFrame(loop)
+    }
 
-  // Sleep state for Mimi
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      if (hopTimer) clearTimeout(hopTimer)
+    }
+  }, [petType])
+
+  // ── Target update loop ────────────────────────────────────────────────
   useEffect(() => {
-    if (petType !== 'mimi') {
-      setPetState('idle')
-      return
+    const interval = setInterval(() => {
+      if (isPeekingRef.current) return
+      const newTarget = randomSafeTarget(petType, posRef.current.x)
+      targetRef.current = newTarget
+    }, petType === 'biscuit' ? 2500 : petType === 'jeebie' ? 2000 : 4000 + Math.random() * 4000)
+
+    return () => clearInterval(interval)
+  }, [petType])
+
+  // ── Personality behaviour loop ────────────────────────────────────────
+  useEffect(() => {
+    const [minMs, maxMs] = PET_BEHAVIOUR_INTERVAL[petType] || [6000, 12000]
+
+    const schedule = () => {
+      const delay = minMs + Math.random() * (maxMs - minMs)
+      behaviourTimerRef.current = setTimeout(() => {
+        runBehaviour()
+        schedule()
+      }, delay)
     }
-    const checkSleep = () => {
-      const inactiveTime = Date.now() - lastInteractionRef.current
-      if (inactiveTime > behaviour.idleSleepMs && petState !== 'sleep') setPetState('sleep')
+
+    const runBehaviour = () => {
+      if (isPeekingRef.current) return
+
+      switch (petType) {
+        case 'mimi': {
+          const elapsed = Date.now() - lastIdleRef.current
+          if (elapsed > 12000 && petStateRef.current !== 'sleep') {
+            petStateRef.current = 'sleep'
+            setPetState('sleep')
+            setAnimClass('pet-anim-mimi-sleep')
+          } else {
+            const pick = Math.random()
+            if (pick < 0.5) setAnimClass('pet-anim-mimi-float')
+            else setAnimClass('pet-anim-toffee-tilt')
+            clearAnimAfter(2800)
+          }
+          break
+        }
+        case 'jeebie': {
+          const pick = Math.floor(Math.random() * 4)
+          if (pick === 0) {
+            // DART — velocity burst
+            velRef.current.x = (Math.random() > 0.5 ? 1 : -1) * 4
+            velRef.current.y = (Math.random() - 0.5) * 2
+          } else if (pick === 1) {
+            setAnimClass('pet-anim-jeebie-spin')
+            clearAnimAfter(450)
+          } else if (pick === 2) {
+            setAnimClass('pet-anim-jeebie-pounce')
+            clearAnimAfter(950)
+          } else {
+            setAnimClass('pet-anim-jeebie-vibrate')
+            clearAnimAfter(550)
+          }
+          break
+        }
+        case 'toffee': {
+          const pick = Math.floor(Math.random() * 3)
+          if (pick === 0) {
+            setAnimClass('pet-anim-toffee-tilt')
+            clearAnimAfter(1800)
+          } else if (pick === 1) {
+            // Groom — slow scale bow
+            setAnimClass('pet-anim-biscuit-wiggle')
+            clearAnimAfter(1200)
+          } else {
+            setAnimClass('pet-anim-mimi-float')
+            clearAnimAfter(2500)
+          }
+          break
+        }
+        case 'biscuit': {
+          const pick = Math.floor(Math.random() * 4)
+          if (pick === 0) {
+            setAnimClass('pet-anim-biscuit-bounce')
+            clearAnimAfter(900)
+          } else if (pick === 1) {
+            // ZOOMIES — speed burst
+            velRef.current.x = (Math.random() > 0.5 ? 1 : -1) * 8
+            targetRef.current = randomSafeTarget('biscuit', posRef.current.x)
+          } else if (pick === 2) {
+            setAnimClass('pet-anim-biscuit-wiggle')
+            clearAnimAfter(700)
+          } else {
+            // SNIFF — bob
+            setAnimClass('pet-anim-mochi-hop')
+            clearAnimAfter(900)
+          }
+          break
+        }
+        case 'pudding': {
+          const pick = Math.floor(Math.random() * 3)
+          if (pick === 0) {
+            setAnimClass('pet-anim-pudding-spin')
+            clearAnimAfter(750)
+          } else if (pick === 1) {
+            setAnimClass('pet-anim-pudding-jiggle')
+            clearAnimAfter(1200)
+          } else {
+            // Long pause — do nothing, already slow
+          }
+          break
+        }
+        case 'pepper': {
+          setAnimClass('pet-anim-pepper-blink')
+          clearAnimAfter(600)
+          break
+        }
+        case 'coco': {
+          // Gentle rock is always-on via CSS on body; wave on click
+          setAnimClass('pet-anim-coco-rock')
+          break
+        }
+        default:
+          break
+      }
     }
-    const interval = setInterval(checkSleep, 1000)
+
+    schedule()
+    return () => clearTimeout(behaviourTimerRef.current)
+  }, [petType])
+
+  const clearAnimAfter = useCallback((ms) => {
+    if (animTimerRef.current) clearTimeout(animTimerRef.current)
+    animTimerRef.current = setTimeout(() => setAnimClass('pet-anim-breathe'), ms + 100)
+  }, [])
+
+  // ── Wake Mimi on interaction ──────────────────────────────────────────
+  useEffect(() => {
+    if (petType !== 'mimi') return
     const wake = () => {
-      lastInteractionRef.current = Date.now()
-      if (petState === 'sleep') setPetState('idle')
+      lastIdleRef.current = Date.now()
+      if (petStateRef.current === 'sleep') {
+        petStateRef.current = 'idle'
+        setPetState('idle')
+        setAnimClass('pet-anim-breathe')
+      }
     }
-    window.addEventListener('mousemove', wake)
+    window.addEventListener('mousemove', wake, { passive: true })
     window.addEventListener('keydown', wake)
     window.addEventListener('click', wake)
-    window.addEventListener('scroll', wake)
+    window.addEventListener('scroll', wake, { passive: true })
     return () => {
-      clearInterval(interval)
       window.removeEventListener('mousemove', wake)
       window.removeEventListener('keydown', wake)
       window.removeEventListener('click', wake)
       window.removeEventListener('scroll', wake)
     }
-  }, [petType, petState, behaviour.idleSleepMs])
+  }, [petType])
 
-  // Scroll opacity dim
+  // ── Biscuit + Coco — react to click position ─────────────────────────
+  useEffect(() => {
+    if (petType !== 'biscuit' && petType !== 'coco') return
+    const handleClick = (e) => {
+      if (isPeekingRef.current) return
+      const xPct = (e.clientX / window.innerWidth) * 100
+      if (petType === 'biscuit') {
+        targetRef.current = { x: Math.max(1, Math.min(97, xPct)), y: 83 + Math.random() * 6 }
+      }
+      if (petType === 'coco') {
+        setAnimClass('pet-anim-coco-wave')
+        if (animTimerRef.current) clearTimeout(animTimerRef.current)
+        animTimerRef.current = setTimeout(() => setAnimClass('pet-anim-coco-rock'), 700)
+      }
+    }
+    window.addEventListener('click', handleClick)
+    return () => window.removeEventListener('click', handleClick)
+  }, [petType])
+
+  // ── Mochi scroll-freeze ───────────────────────────────────────────────
+  useEffect(() => {
+    if (petType !== 'mochi') return
+    const onScroll = () => {
+      isFrozenRef.current = true
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+      scrollTimerRef.current = setTimeout(() => {
+        isFrozenRef.current = false
+      }, 1500)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [petType])
+
+  // ── Scroll opacity ────────────────────────────────────────────────────
   useEffect(() => {
     const handleScroll = () => {
       setScrolling(true)
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
-      scrollTimerRef.current = setTimeout(() => setScrolling(false), 1500)
+      if (scrollTimerRef.current && petType !== 'mochi') clearTimeout(scrollTimerRef.current)
+      const timer = setTimeout(() => setScrolling(false), 1500)
+      if (petType !== 'mochi') scrollTimerRef.current = timer
     }
-    window.addEventListener('scroll', handleScroll, true)
-    return () => {
-      window.removeEventListener('scroll', handleScroll, true)
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
-    }
-  }, [])
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [petType])
 
-  // Personality motion machine — fires random 3D animations every 4-13s
+  // ── Peek animation ────────────────────────────────────────────────────
   useEffect(() => {
-    const motions = PET_MOTIONS[petType] || []
-    if (!motions.length) return
+    const schedulePeek = () => {
+      const delay = 25000 + Math.random() * 20000
+      peekTimerRef.current = setTimeout(() => {
+        const cards = document.querySelectorAll('.peekable-card')
+        if (!cards.length) {
+          schedulePeek()
+          return
+        }
+        const card = cards[Math.floor(Math.random() * cards.length)]
+        const rect = card.getBoundingClientRect()
 
-    const schedule = () => {
-      const delay = 4000 + Math.random() * 9000
-      motionTimerRef.current = setTimeout(() => {
-        const pick = motions[Math.floor(Math.random() * motions.length)]
-        setMotionAnim(pick.anim)
-        setMotionDuration(pick.duration)
-        motionTimerRef.current = setTimeout(() => {
-          setMotionAnim(null)
-          schedule()
-        }, pick.duration + 150)
+        // Only peek if card is in viewport
+        if (rect.bottom < 0 || rect.top > window.innerHeight) {
+          schedulePeek()
+          return
+        }
+
+        const peekX = ((rect.right - 30) / window.innerWidth) * 100
+        const peekY = ((rect.top - 20) / window.innerHeight) * 100
+
+        // Cancel peek if card scrolls away
+        const observer = new IntersectionObserver(
+          ([entry]) => {
+            if (!entry.isIntersecting && isPeekingRef.current) {
+              endPeek()
+            }
+          },
+          { threshold: 0 }
+        )
+        observer.observe(card)
+
+        isPeekingRef.current = true
+        setIsPeeking(true)
+        setPetState('peek')
+        petStateRef.current = 'peek'
+
+        targetRef.current = {
+          x: Math.max(1, Math.min(97, peekX)),
+          y: Math.max(5, Math.min(85, peekY)),
+        }
+
+        // Face inward toward card center
+        const cardCenterX = ((rect.left + rect.width / 2) / window.innerWidth) * 100
+        facingRef.current = posRef.current.x > cardCenterX ? 'left' : 'right'
+        setFacing(facingRef.current)
+
+        setAnimClass('pet-anim-peek')
+
+        const endPeek = () => {
+          observer.disconnect()
+          isPeekingRef.current = false
+          setIsPeeking(false)
+          setPetState('idle')
+          petStateRef.current = 'idle'
+          setAnimClass('pet-anim-breathe')
+          targetRef.current = randomSafeTarget(petType, posRef.current.x)
+          schedulePeek()
+        }
+
+        peekTimerRef.current = setTimeout(endPeek, 3500)
       }, delay)
     }
 
-    schedule()
-    return () => clearTimeout(motionTimerRef.current)
+    schedulePeek()
+    return () => clearTimeout(peekTimerRef.current)
   }, [petType])
 
+  // ── Tooltip ───────────────────────────────────────────────────────────
   const handleMouseEnter = () => {
-    tooltipTimerRef.current = setTimeout(() => setShowTooltip(true), 500)
+    tooltipTimerRef.current = setTimeout(() => setShowTooltip(true), 600)
   }
   const handleMouseLeave = () => {
     if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current)
     setShowTooltip(false)
   }
 
-  return (
-    <>
-      <style>{PET_ANIM_CSS}</style>
-      <div
-        className="pet-container"
-        style={{
-          left: `${pos.x}%`,
-          top: `${pos.y}%`,
-          opacity: scrolling ? 0.3 : 0.9,
-          transition: 'opacity 300ms ease',
-        }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
-        {/* Facing + centering layer */}
-        <div
-          style={{
-            transform: `translateX(-50%) translateY(-50%) scaleX(${facingLeft ? -1 : 1})`,
-            transition: 'transform 300ms ease',
-            display: 'inline-block',
-          }}
-        >
-          {/* Tooltip (counter-flipped so text always reads correctly) */}
-          {showTooltip && (
-            <div
-              style={{
-                position: 'absolute',
-                bottom: '110%',
-                left: '50%',
-                transform: `translateX(-50%) scaleX(${facingLeft ? -1 : 1})`,
-                background: 'rgba(20, 20, 20, 0.85)',
-                backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255, 75, 137, 0.3)',
-                borderRadius: '9999px',
-                padding: '4px 12px',
-                fontSize: '11px',
-                whiteSpace: 'nowrap',
-                color: '#e2e2e2',
-                pointerEvents: 'none',
-                animation: 'fadeIn 200ms ease',
-              }}
-            >
-              <span style={{ color: '#ff4b89' }}>♥</span>{' '}
-              {petName || 'tap me'}
-            </div>
-          )}
+  const zIndex = petState === 'peek' ? 15 : 5
 
-          {/* 3D animation layer */}
+  return (
+    <div
+      className="pet-container"
+      style={{
+        left: `${pos.x}%`,
+        top: `${pos.y}%`,
+        zIndex,
+        opacity: scrolling ? 0.25 : 0.9,
+        transition: scrolling ? 'opacity 200ms ease' : 'opacity 800ms ease',
+      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div
+        style={{
+          transform: `translateX(-50%) translateY(-50%) scaleX(${facing === 'left' ? -1 : 1})`,
+          transition: 'transform 300ms ease',
+          display: 'inline-block',
+        }}
+      >
+        {/* Tooltip — counter-flip so text is always readable */}
+        {showTooltip && (
           <div
             style={{
-              display: 'inline-block',
-              perspective: '220px',
-              ...(motionAnim
-                ? { animation: `${motionAnim} ${motionDuration}ms ease-in-out both` }
-                : {}),
+              position: 'absolute',
+              bottom: '110%',
+              left: '50%',
+              transform: `translateX(-50%) scaleX(${facing === 'left' ? -1 : 1})`,
+              background: 'rgba(20, 20, 20, 0.88)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255, 75, 137, 0.3)',
+              borderRadius: 9999,
+              padding: '4px 14px',
+              fontSize: 11,
+              whiteSpace: 'nowrap',
+              color: '#e2e2e2',
+              pointerEvents: 'none',
+              animation: 'tooltipFadeIn 200ms ease',
             }}
           >
-            <PetComponent state={petState} size={48} />
+            <span style={{ color: '#ff4b89' }}>♥</span>{' '}
+            {petName || 'tap to name me'}
           </div>
+        )}
+
+        {/* Animation wrapper */}
+        <div className={animClass} style={{ display: 'inline-block' }}>
+          <PetComponent state={petState} size={52} />
         </div>
       </div>
-    </>
+    </div>
   )
 }
