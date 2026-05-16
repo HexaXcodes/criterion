@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { moviesApi } from '../api/movies'
 import { usersApi } from '../api/users'
 import { useAuth } from '../context/AuthContext'
-import { GENRES } from '../utils/helpers'
+import { GENRES, LANGUAGES } from '../utils/helpers'
 import GenreBackground from '../components/GenreBackground'
 import TopBar from '../components/TopBar'
 import BottomNav from '../components/BottomNav'
@@ -17,8 +17,9 @@ export default function DiscoverPage() {
   const { isAuthenticated, showToast } = useAuth()
 
   const [query, setQuery] = useState('')
-  const [activeGenre, setActiveGenre] = useState('All')
-  const [sort, setSort] = useState('rating_desc')
+  const [activeGenre, setActiveGenre] = useState(() => sessionStorage.getItem('discoverGenre') || 'All')
+  const [sort, setSort] = useState(() => sessionStorage.getItem('discoverSort') || 'rating_desc')
+  const [activeLang, setActiveLang] = useState(() => sessionStorage.getItem('discoverLang') || 'all')
   const [searchResults, setSearchResults] = useState([])
   const [searchTotal, setSearchTotal] = useState(0)
   const [searchPage, setSearchPage] = useState(1)
@@ -65,15 +66,20 @@ export default function DiscoverPage() {
       .catch(() => {})
   }, [preferredLangs])
 
-  // Reset page when query, genre, or sort changes
+  // Persist filter state so back-navigation restores it
+  useEffect(() => { sessionStorage.setItem('discoverGenre', activeGenre) }, [activeGenre])
+  useEffect(() => { sessionStorage.setItem('discoverSort', sort) }, [sort])
+  useEffect(() => { sessionStorage.setItem('discoverLang', activeLang) }, [activeLang])
+
+  // Reset page when query, genre, sort, or language filter changes
   useEffect(() => {
     setSearchPage(1)
     setSearchResults([])
     setSearchTotal(0)
-  }, [query, activeGenre, sort])
+  }, [query, activeGenre, sort, activeLang])
 
   useEffect(() => {
-    if (!query && activeGenre === 'All') {
+    if (!query && activeGenre === 'All' && activeLang === 'all') {
       setSearchResults([])
       setSearchTotal(0)
       return
@@ -81,7 +87,7 @@ export default function DiscoverPage() {
     const t = setTimeout(() => {
       setSearchLoading(true)
       moviesApi
-        .search(query, activeGenre, searchPage, 40, sort, preferredLangs)
+        .search(query, activeGenre, searchPage, 40, sort, preferredLangs, activeLang)
         .then(({ movies, total }) => {
           setSearchResults((prev) => searchPage === 1 ? movies : [...prev, ...movies])
           setSearchTotal(total)
@@ -90,7 +96,7 @@ export default function DiscoverPage() {
         .finally(() => setSearchLoading(false))
     }, searchPage === 1 ? 400 : 0)
     return () => clearTimeout(t)
-  }, [query, activeGenre, searchPage, sort])
+  }, [query, activeGenre, searchPage, sort, preferredLangs, activeLang])
 
   return (
     <div className="min-h-screen relative">
@@ -136,41 +142,37 @@ export default function DiscoverPage() {
           ))}
         </div>
 
-        {/* Sort controls — visible when browsing genre or searching */}
-        {(query || activeGenre !== 'All') && (
-          <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scroll-x">
-            <span className="text-text-muted text-xs tracking-widest font-bold flex-shrink-0">SORT</span>
-            {[
-              { key: 'rating_desc', label: '★ High → Low' },
-              { key: 'rating_asc',  label: '★ Low → High' },
-              { key: 'alpha',       label: 'A → Z' },
-              { key: 'alpha_desc',  label: 'Z → A' },
-            ].map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setSort(key)}
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: 99,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  fontFamily: 'Space Grotesk',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                  background: sort === key ? 'linear-gradient(135deg,#ff4b89,#ff2070)' : 'rgba(255,255,255,0.05)',
-                  border: sort === key ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                  color: sort === key ? '#fff' : '#9a9a9a',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {label}
-              </button>
-            ))}
+        {/* Language + Sort filter row — always visible */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-text-muted text-xs tracking-widest font-bold flex-shrink-0">LANG</span>
+            <StyledSelect
+              value={activeLang}
+              onChange={setActiveLang}
+              highlighted={activeLang !== 'all'}
+              options={[
+                { value: 'all', label: 'All Languages' },
+                ...LANGUAGES.map(({ code, label }) => ({ value: code, label })),
+              ]}
+            />
           </div>
-        )}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-text-muted text-xs tracking-widest font-bold flex-shrink-0">SORT</span>
+            <StyledSelect
+              value={sort}
+              onChange={setSort}
+              options={[
+                { value: 'rating_desc', label: '★ High → Low' },
+                { value: 'rating_asc',  label: '★ Low → High' },
+                { value: 'alpha',       label: 'A → Z' },
+                { value: 'alpha_desc',  label: 'Z → A' },
+              ]}
+            />
+          </div>
+        </div>
 
-        {/* Search / genre results */}
-        {(query || activeGenre !== 'All') && (
+        {/* Search / genre / language results */}
+        {(query || activeGenre !== 'All' || activeLang !== 'all') && (
           <>
             {searchResults.length > 0 && (
               <Section
@@ -205,7 +207,7 @@ export default function DiscoverPage() {
           </>
         )}
 
-        {(!query && activeGenre === 'All') && (
+        {(!query && activeGenre === 'All' && activeLang === 'all') && (
           <>
             {/* For You */}
             {isAuthenticated && !isGuest && forYou.length > 0 && (
@@ -386,6 +388,52 @@ function CompactGrid({ movies, navigate }) {
 function HorizontalScroll({ children }) {
   return (
     <div className="flex gap-3 overflow-x-auto pb-2 scroll-x">{children}</div>
+  )
+}
+
+function StyledSelect({ value, onChange, options, highlighted }) {
+  return (
+    <div className="relative flex-1 min-w-0">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          WebkitAppearance: 'none',
+          appearance: 'none',
+          width: '100%',
+          background: highlighted ? 'linear-gradient(135deg,#ff4b89,#ff2070)' : 'rgba(255,255,255,0.05)',
+          border: highlighted ? 'none' : '1px solid rgba(255,255,255,0.1)',
+          color: '#fff',
+          borderRadius: 99,
+          padding: '5px 28px 5px 12px',
+          fontSize: 11,
+          fontWeight: 700,
+          fontFamily: 'Space Grotesk',
+          cursor: 'pointer',
+          outline: 'none',
+        }}
+      >
+        {options.map(({ value: v, label }) => (
+          <option key={v} value={v} style={{ background: '#1a1a1a', color: '#fff' }}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <span
+        style={{
+          position: 'absolute',
+          right: 10,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          pointerEvents: 'none',
+          fontSize: 8,
+          color: '#fff',
+          opacity: 0.6,
+        }}
+      >
+        ▼
+      </span>
+    </div>
   )
 }
 

@@ -127,18 +127,19 @@ export default function MovieDetailPage() {
       </button>
 
       {/* Full bleed poster */}
-      <div className="relative" style={{ height: '55vh' }}>
+      <div className="relative" style={{ height: '72vh', minHeight: 380 }}>
         <MoviePoster
           posterUrl={movie.posterUrl}
           title={movie.title}
           size="original"
           className="absolute inset-0 w-full h-full"
+          style={{ objectFit: 'cover', objectPosition: 'center top' }}
         />
         <div
           className="absolute inset-0"
           style={{
             background:
-              'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0) 40%, #0a0a0a 100%)',
+              'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0) 35%, rgba(10,10,10,0.7) 75%, #0a0a0a 100%)',
           }}
         />
       </div>

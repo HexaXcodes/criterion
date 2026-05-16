@@ -7,4 +7,5 @@ export const usersApi = {
   addToWatchlist: (movieId) => api.post('/users/watchlist', { movieId }).then((r) => r.data),
   getStreak: () => api.get('/users/streak').then((r) => r.data),
   getLeaderboard: () => api.get('/users/leaderboard').then((r) => r.data),
+  updateAccount: (data) => api.put('/users/account', data).then((r) => r.data),
 }

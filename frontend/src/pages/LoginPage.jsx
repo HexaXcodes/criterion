@@ -39,7 +39,7 @@ export default function LoginPage() {
 
       <header className="z-content px-4 py-4 flex items-center justify-between">
         <Link to="/" className="text-text-secondary text-sm">← Back</Link>
-        <span className="brand-wordmark text-lg">CRITERION</span>
+        <Link to="/" className="brand-wordmark text-lg">CRITERION</Link>
         <div className="w-12" />
       </header>
 

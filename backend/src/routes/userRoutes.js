@@ -6,7 +6,8 @@ const {
   updatePreferences,
   markWatched,
   addToWatchlist,
-  getLeaderboard
+  getLeaderboard,
+  updateAccount,
 } = require("../controllers/userController");
 
 router.get("/leaderboard", getLeaderboard);
@@ -14,6 +15,7 @@ router.get("/profile", protect, getProfile);
 router.put("/preferences", protect, updatePreferences);
 router.post("/watched", protect, markWatched);
 router.post("/watchlist", protect, addToWatchlist);
+router.put("/account", protect, updateAccount);
 router.get("/streak", protect, async (req, res) => {
   try {
     const User = require("../models/User");

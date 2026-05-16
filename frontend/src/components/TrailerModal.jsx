@@ -15,7 +15,10 @@ export default function TrailerModal({ movieId, movieTitle, onClose }) {
           setError('No trailer available for this movie.')
         }
       })
-      .catch(() => setError('Could not load trailer. Please try again.'))
+      .catch((err) => {
+        const msg = err.response?.data?.message
+        setError(msg || 'Could not load trailer. Please try again.')
+      })
       .finally(() => setLoading(false))
   }, [movieId])
 
@@ -119,9 +122,9 @@ export default function TrailerModal({ movieId, movieTitle, onClose }) {
           )}
           {!loading && youtubeKey && (
             <iframe
-              src={`https://www.youtube.com/embed/${youtubeKey}?autoplay=1`}
+              src={`https://www.youtube.com/embed/${youtubeKey}?autoplay=1&mute=1&rel=0&modestbranding=1`}
               title={`${movieTitle} trailer`}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
               style={{
                 position: 'absolute',

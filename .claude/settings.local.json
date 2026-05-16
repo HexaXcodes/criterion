@@ -13,7 +13,8 @@
       "Bash(find \"c:\\\\\\\\Users\\\\\\\\Aadvik Gowda\\\\\\\\OneDrive\\\\\\\\ドキュメント\\\\\\\\Desktop\\\\\\\\Movierevproj\\\\\\\\backend\\\\\\\\src\\\\\\\\routes\" -type f -name \"*.js\")",
       "PowerShell(Stop-Process -Id \\(Get-NetTCPConnection -LocalPort 5000 -State Listen\\).OwningProcess -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; Write-Host \"Port 5000 freed\")",
       "PowerShell(cd \"c:\\\\Users\\\\Aadvik Gowda\\\\OneDrive\\\\ドキュメント\\\\Desktop\\\\Movierevproj\\\\backend\"; Start-Process -FilePath \"node\" -ArgumentList \"server.js\" -WorkingDirectory \\(Get-Location\\) -WindowStyle Normal; Start-Sleep -Seconds 3; $conn = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue; if \\($conn\\) { \"Backend is running on port 5000 \\(PID $\\($conn.OwningProcess\\)\\)\" } else { \"Backend not detected on port 5000\" })",
-      "Bash(node src/scripts/seedMovies.js)"
+      "Bash(node src/scripts/seedMovies.js)",
+      "Bash(xargs grep -l \"seedMovies\\\\|importMovies\\\\|bulkImport\")"
     ]
   }
 }

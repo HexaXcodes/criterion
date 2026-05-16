@@ -112,3 +112,26 @@ exports.getLeaderboard = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// Update account (name + optional password change)
+exports.updateAccount = async (req, res) => {
+  try {
+    const { name, currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (name) user.name = name.trim();
+
+    if (newPassword) {
+      const bcrypt = require("bcryptjs");
+      const match = await bcrypt.compare(currentPassword || "", user.password);
+      if (!match) return res.status(400).json({ message: "Current password is incorrect" });
+      user.password = await bcrypt.hash(newPassword, 10);
+    }
+
+    await user.save();
+    res.json({ message: "Account updated" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

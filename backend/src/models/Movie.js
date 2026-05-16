@@ -22,14 +22,18 @@ const movieSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  type: {
+    type: String,
+    default: 'movie',
+    enum: ['movie', 'tv'],
+  },
   language: {
     type: String,
     default: 'en'
   },
   tmdbId: {
     type: Number,
-    unique: true,
-    sparse: true
+    sparse: true,
   },
   createdAt: {
     type: Date,

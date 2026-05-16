@@ -118,7 +118,7 @@ export default function SignupPage() {
 
       {/* Top bar with progress */}
       <header className="z-content px-4 py-4 flex items-center justify-between">
-        <span className="brand-wordmark text-lg">CRITERION</span>
+        <Link to="/" className="brand-wordmark text-lg">CRITERION</Link>
         <ProgressDots step={step} />
         <Link to="/" className="text-text-muted text-xl">×</Link>
       </header>

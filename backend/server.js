@@ -16,6 +16,11 @@ const jwt = require("jsonwebtoken");
 dotenv.config();
 connectDB();
 
+// Backfill language for movies missing it — runs in background after DB connects
+setTimeout(() => {
+  require("./src/scripts/backfillLanguage").runBackfill().catch(() => {});
+}, 3000);
+
 const app = express();
 const cors = require("cors");
 app.use(cors({

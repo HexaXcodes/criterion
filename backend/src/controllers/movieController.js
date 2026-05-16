@@ -2,6 +2,7 @@ const Movie = require("../models/Movie");
 const https = require("https");
 
 // Helper: HTTPS GET with optional headers, returns a Promise<object>
+// Rejects on non-2xx HTTP status so callers get real errors instead of TMDB error bodies
 const httpsGet = (url, headers = {}) =>
   new Promise((resolve, reject) => {
     const parsed = new URL(url);
@@ -15,8 +16,16 @@ const httpsGet = (url, headers = {}) =>
       let data = "";
       res.on("data", (chunk) => (data += chunk));
       res.on("end", () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(e); }
+        try {
+          const body = JSON.parse(data);
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(body);
+          } else {
+            reject(new Error(`TMDB ${res.statusCode}: ${body.status_message || JSON.stringify(body)}`));
+          }
+        } catch (e) {
+          reject(e);
+        }
       });
     });
     req.on("error", reject);
@@ -83,6 +92,11 @@ exports.searchMovies = async (req, res) => {
     const filter = {};
     if (query) filter.title = { $regex: query, $options: "i" };
     if (genre) filter.genre = { $in: [genre] };
+    if (req.query.lang && req.query.lang !== 'all') {
+      filter.language = req.query.lang === 'en'
+        ? { $in: ['en', null] }
+        : req.query.lang;
+    }
 
     const langs = req.query.langs ? req.query.langs.split(",").filter(Boolean) : [];
     const total = await Movie.countDocuments(filter);
@@ -260,32 +274,46 @@ exports.getMovieTrailer = async (req, res) => {
     // Search TMDB by title if no cached tmdbId
     if (!tmdbId) {
       const query = encodeURIComponent(movie.title);
-      const yearParam = movie.releaseYear ? `&year=${movie.releaseYear}` : "";
-      const searchData = await httpsGet(
-        `https://api.themoviedb.org/3/search/movie?query=${query}${yearParam}`,
-        authHeaders
-      );
-      if (searchData.results && searchData.results.length > 0) {
-        tmdbId = searchData.results[0].id;
-        await Movie.findByIdAndUpdate(req.params.id, { tmdbId });
+
+      // Try with year first, fall back to title-only so year mismatches don't block us
+      const searches = movie.releaseYear
+        ? [
+            `https://api.themoviedb.org/3/search/movie?query=${query}&year=${movie.releaseYear}`,
+            `https://api.themoviedb.org/3/search/movie?query=${query}`,
+          ]
+        : [`https://api.themoviedb.org/3/search/movie?query=${query}`];
+
+      for (const url of searches) {
+        try {
+          const searchData = await httpsGet(url, authHeaders);
+          if (searchData.results && searchData.results.length > 0) {
+            tmdbId = searchData.results[0].id;
+            await Movie.findByIdAndUpdate(req.params.id, { tmdbId });
+            break;
+          }
+        } catch (_) {
+          // try next search variant
+        }
       }
     }
 
-    if (!tmdbId) return res.status(404).json({ message: "Trailer not found" });
+    if (!tmdbId) return res.status(404).json({ message: "No trailer found for this title" });
 
     const videosData = await httpsGet(
-      `https://api.themoviedb.org/3/movie/${tmdbId}/videos`,
+      `https://api.themoviedb.org/3/movie/${tmdbId}/videos?language=en-US`,
       authHeaders
     );
 
     const trailer =
       videosData.results?.find((v) => v.type === "Trailer" && v.site === "YouTube") ||
+      videosData.results?.find((v) => v.type === "Teaser" && v.site === "YouTube") ||
       videosData.results?.find((v) => v.site === "YouTube");
 
-    if (!trailer) return res.status(404).json({ message: "Trailer not found" });
+    if (!trailer) return res.status(404).json({ message: "No trailer found for this title" });
 
     res.json({ youtubeKey: trailer.key, title: trailer.name });
   } catch (error) {
+    console.error("Trailer fetch error:", error.message);
     res.status(500).json({ message: error.message });
   }
 };

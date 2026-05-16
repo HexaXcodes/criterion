@@ -11,19 +11,42 @@ import MimiPet from '../components/pets/MimiPet'
 import JeebiePet from '../components/pets/JeebiePet'
 import ToffeePet from '../components/pets/ToffeePet'
 import BiscuitPet from '../components/pets/BiscuitPet'
+import MochiPet from '../components/pets/MochiPet'
+import PuddingPet from '../components/pets/PuddingPet'
+import PepperPet from '../components/pets/PepperPet'
+import CocoPet from '../components/pets/CocoPet'
 
 const PET_COMPONENTS = {
   mimi: MimiPet,
   jeebie: JeebiePet,
   toffee: ToffeePet,
   biscuit: BiscuitPet,
+  mochi: MochiPet,
+  pudding: PuddingPet,
+  pepper: PepperPet,
+  coco: CocoPet,
 }
 const PET_DESCRIPTIONS = {
   mimi: 'A mysterious dreamer who watches films twice — once for the plot, once for the vibe.',
   jeebie: 'A chaotic cinephile who starts 6 movies a night and finishes maybe one.',
   toffee: 'Sophisticated. Has opinions about lens choices. Probably owns a film poster.',
   biscuit: 'Loyal and always hype. Has seen every Marvel film opening night.',
+  mochi: 'Soft and quiet. Has a 5-star spreadsheet for every film they\'ve ever seen.',
+  pudding: 'Dark and mysterious. Only watches films after midnight.',
+  pepper: 'Snarky critic energy. Never gives more than 4 stars, on principle.',
+  coco: 'Warm and enthusiastic. Cries at every film, even the bad ones.',
 }
+
+const ALL_PETS = [
+  { id: 'mimi',    name: 'Mimi',    component: MimiPet,    color: '#ff4b89' },
+  { id: 'jeebie',  name: 'Jeebie',  component: JeebiePet,  color: '#00dbe9' },
+  { id: 'toffee',  name: 'Toffee',  component: ToffeePet,  color: '#ffb347' },
+  { id: 'biscuit', name: 'Biscuit', component: BiscuitPet, color: '#ff8c69' },
+  { id: 'mochi',   name: 'Mochi',   component: MochiPet,   color: '#c084fc' },
+  { id: 'pudding', name: 'Pudding', component: PuddingPet, color: '#818cf8' },
+  { id: 'pepper',  name: 'Pepper',  component: PepperPet,  color: '#fb7185' },
+  { id: 'coco',    name: 'Coco',    component: CocoPet,    color: '#34d399' },
+]
 
 export default function ProfilePage() {
   const navigate = useNavigate()
@@ -35,6 +58,9 @@ export default function ProfilePage() {
   const [leaderboard, setLeaderboard] = useState([])
   const [loading, setLoading] = useState(true)
   const [showPrefs, setShowPrefs] = useState(false)
+  const [showPetPicker, setShowPetPicker] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const [editPetName, setEditPetName] = useState(petName)
   const [savingName, setSavingName] = useState(false)
 
@@ -234,7 +260,7 @@ export default function ProfilePage() {
 
               {/* Change companion row */}
               <button
-                onClick={() => navigate('/signup?step=3')}
+                onClick={() => setShowPetPicker(true)}
                 className="text-teal-neon text-xs font-semibold hover:underline"
               >
                 Change companion →
@@ -293,12 +319,12 @@ export default function ProfilePage() {
               <SettingsRow
                 icon="⚙️"
                 label="Account Settings"
-                onClick={() => showToast('Coming soon', 'info')}
+                onClick={() => setShowSettings(true)}
               />
               <SettingsRow
                 icon="🕐"
                 label="Viewing History"
-                onClick={() => showToast('Coming soon', 'info')}
+                onClick={() => setShowHistory(true)}
               />
             </div>
 
@@ -331,6 +357,63 @@ export default function ProfilePage() {
             setShowPrefs(false)
           }}
         />
+      )}
+
+      {showPetPicker && (
+        <div
+          onClick={() => setShowPetPicker(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 480, borderRadius: 24,
+              background: '#111', border: '1px solid rgba(255,75,137,0.2)',
+              padding: '28px 20px 20px', display: 'flex', flexDirection: 'column', gap: 16,
+            }}
+          >
+            <div style={{ fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: 18, color: '#fff', textAlign: 'center' }}>
+              Choose your companion
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+              {ALL_PETS.map((pet) => {
+                const PetSvg = pet.component
+                const isSelected = petType === pet.id
+                return (
+                  <button
+                    key={pet.id}
+                    onClick={() => { setPetType(pet.id); setShowPetPicker(false); showToast(`Switched to ${pet.name}!`, 'success') }}
+                    style={{
+                      borderRadius: 16, padding: '12px 8px',
+                      background: isSelected ? 'rgba(255,75,137,0.1)' : 'rgba(255,255,255,0.03)',
+                      border: isSelected ? `2px solid ${pet.color}` : '1px solid rgba(255,255,255,0.08)',
+                      boxShadow: isSelected ? `0 0 20px ${pet.color}55` : 'none',
+                      cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                      transition: 'all 150ms ease',
+                    }}
+                  >
+                    <PetSvg size={52} state="idle" />
+                    <span style={{ fontFamily: 'Space Grotesk', fontSize: 11, fontWeight: 600, color: isSelected ? pet.color : '#9a9a9a' }}>
+                      {pet.name}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSettings && (
+        <AccountSettingsModal user={user} onClose={() => setShowSettings(false)} />
+      )}
+
+      {showHistory && (
+        <ViewingHistoryModal watched={profile?.watchedMovies || []} onClose={() => setShowHistory(false)} />
       )}
 
       <BottomNav />
@@ -448,6 +531,115 @@ function EditPreferencesModal({ currentGenres, currentLanguages, onClose, onSave
             {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function AccountSettingsModal({ user, onClose }) {
+  const { showToast } = useAuth()
+  const [displayName, setDisplayName] = useState(user?.name || '')
+  const [currentPw, setCurrentPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!displayName.trim()) { showToast('Name cannot be empty', 'error'); return }
+    setSaving(true)
+    try {
+      const body = { name: displayName.trim() }
+      if (newPw) {
+        if (!currentPw) { showToast('Enter your current password', 'error'); setSaving(false); return }
+        if (newPw.length < 6) { showToast('New password must be 6+ chars', 'error'); setSaving(false); return }
+        body.currentPassword = currentPw
+        body.newPassword = newPw
+      }
+      await usersApi.updateAccount(body)
+      showToast('Account updated', 'success')
+      onClose()
+    } catch (err) {
+      showToast(err?.response?.data?.message || 'Could not update', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="z-modal fixed inset-0 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+      onClick={onClose}
+    >
+      <div onClick={(e) => e.stopPropagation()}
+        className="glass-strong w-full max-w-sm rounded-3xl p-6"
+        style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+      >
+        <h2 style={{ fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: 20, color: '#fff', margin: 0 }}>Account Settings</h2>
+
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: '#9a9a9a', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Display Name</label>
+          <input className="input-glass" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={40} />
+        </div>
+
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: '#9a9a9a', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Email</label>
+          <input className="input-glass" value={user?.email || ''} disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} />
+        </div>
+
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 12 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: '#9a9a9a', textTransform: 'uppercase', marginBottom: 10 }}>Change Password <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input className="input-glass" type="password" placeholder="Current password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} />
+            <input className="input-glass" type="password" placeholder="New password (min 6 chars)" value={newPw} onChange={(e) => setNewPw(e.target.value)} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onClose} className="btn-secondary flex-1 text-sm">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 text-sm disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ViewingHistoryModal({ watched, onClose }) {
+  return (
+    <div className="z-modal fixed inset-0 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+      onClick={onClose}
+    >
+      <div onClick={(e) => e.stopPropagation()}
+        className="glass-strong w-full max-w-md rounded-3xl p-6"
+        style={{ maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: 16 }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: 20, color: '#fff', margin: 0 }}>Viewing History</h2>
+          <span style={{ fontSize: 12, color: '#9a9a9a' }}>{watched.length} watched</span>
+        </div>
+
+        {watched.length === 0 ? (
+          <p style={{ color: '#9a9a9a', fontSize: 14, textAlign: 'center', padding: '32px 0' }}>No films marked as watched yet.</p>
+        ) : (
+          <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {watched.map((m) => (
+              <div key={m._id} className="glass" style={{ display: 'flex', alignItems: 'center', gap: 12, borderRadius: 14, padding: '10px 12px' }}>
+                {m.posterUrl
+                  ? <img src={m.posterUrl} alt={m.title} style={{ width: 40, height: 58, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                  : <div style={{ width: 40, height: 58, borderRadius: 8, background: 'rgba(255,75,137,0.1)', flexShrink: 0 }} />
+                }
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 14, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.title}</div>
+                  <div style={{ fontSize: 12, color: '#9a9a9a', marginTop: 2 }}>{m.genre?.slice(0, 2).join(' · ')} {m.releaseYear ? `· ${m.releaseYear}` : ''}</div>
+                  <div style={{ fontSize: 12, color: '#ff4b89', marginTop: 2 }}>★ {m.averageRating?.toFixed(1)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button onClick={onClose} className="btn-secondary w-full text-sm">Close</button>
       </div>
     </div>
   )
