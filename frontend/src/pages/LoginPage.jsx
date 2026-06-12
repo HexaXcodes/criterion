@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { ForgotPasswordModal, VerifyCodeModal, ResetPasswordModal } from '../components/PasswordRecoveryComponents'
 
 export default function LoginPage() {
   const { login, showToast } = useAuth()
@@ -9,6 +10,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Password recovery states
+  const [showForgot, setShowForgot] = useState(false)
+  const [showVerify, setShowVerify] = useState(false)
+  const [showReset, setShowReset] = useState(false)
+  const [recoveryEmail, setRecoveryEmail] = useState('')
+  const [resetToken, setResetToken] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -24,6 +32,25 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleForgotSuccess = (email) => {
+    setRecoveryEmail(email)
+    setShowForgot(false)
+    setShowVerify(true)
+  }
+
+  const handleVerifySuccess = (token) => {
+    setResetToken(token)
+    setShowVerify(false)
+    setShowReset(true)
+  }
+
+  const handleResetSuccess = () => {
+    setShowReset(false)
+    setRecoveryEmail('')
+    setResetToken('')
+    showToast('Password reset successful! Please sign in.', 'success')
   }
 
   return (
@@ -64,9 +91,18 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-text-secondary tracking-widest mb-2 uppercase">
-              Password
-            </label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-xs font-semibold text-text-secondary tracking-widest uppercase">
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowForgot(true)}
+                className="text-xs text-pink-neon hover:underline cursor-pointer"
+              >
+                Forgot Password?
+              </button>
+            </div>
             <input
               type="password"
               required
@@ -100,6 +136,25 @@ export default function LoginPage() {
           </Link>
         </p>
       </main>
+
+      <ForgotPasswordModal
+        isOpen={showForgot}
+        onClose={() => setShowForgot(false)}
+        onSuccess={handleForgotSuccess}
+      />
+      <VerifyCodeModal
+        isOpen={showVerify}
+        onClose={() => setShowVerify(false)}
+        email={recoveryEmail}
+        onSuccess={handleVerifySuccess}
+      />
+      <ResetPasswordModal
+        isOpen={showReset}
+        onClose={() => setShowReset(false)}
+        email={recoveryEmail}
+        resetToken={resetToken}
+        onSuccess={handleResetSuccess}
+      />
     </div>
   )
 }

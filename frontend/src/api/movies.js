@@ -16,6 +16,7 @@ export const moviesApi = {
     const params = excludeIds.length ? { exclude: excludeIds.join(',') } : {}
     return api.get('/movies/recommendations/explained', { params }).then((r) => r.data)
   },
+  getRecommendationHealth: () => api.get('/movies/recommendations/health').then((r) => r.data),
   getGenreSections: (limit = 10, langs = []) => {
     const params = { limit }
     if (langs.length > 0) params.langs = langs.join(',')

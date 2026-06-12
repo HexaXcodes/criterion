@@ -44,6 +44,16 @@ export default function FeedPage() {
   const movie = movies[index]
   const movieId = movie?._id || movie?.id
 
+  useEffect(() => {
+    movies.slice(index + 1, index + 3).forEach((nextMovie) => {
+      if (!nextMovie?.posterUrl) return
+      const img = new Image()
+      img.src = nextMovie.posterUrl.startsWith('/')
+        ? `https://image.tmdb.org/t/p/w1280${nextMovie.posterUrl}`
+        : nextMovie.posterUrl.replace(/\/t\/p\/(?:w\d+|original)\//, '/t/p/w1280/')
+    })
+  }, [index, movies])
+
   const refresh = () => {
     setRefreshing(true)
     setMovies([])
@@ -97,10 +107,9 @@ export default function FeedPage() {
       await reviewsApi.add({ movieId, rating: 5, comment: 'Loved it' })
       setLiked((s) => new Set([...s, movieId]))
       showToast('Liked', 'success', 1800)
+      refresh()
     } catch (err) {
       showToast(err.response?.data?.message || 'Could not like', 'error')
-    } finally {
-      next()
     }
   }
 
@@ -113,8 +122,10 @@ export default function FeedPage() {
     if (!movie || saved.has(movieId)) return
     try {
       await usersApi.addToWatchlist(movieId)
+      markSeen(movieId)
       setSaved((s) => new Set([...s, movieId]))
       showToast('Added to watchlist', 'success', 1800)
+      refresh()
     } catch (err) {
       showToast(err.response?.data?.message || 'Already in watchlist', 'info')
     }
@@ -152,40 +163,43 @@ export default function FeedPage() {
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          {/* Full-bleed poster */}
+          {/* Feed card with ambient blur background + crisp poster */}
           <div
-            className="relative cursor-pointer animate-fade-in peekable-card"
-            style={{ minHeight: 'calc(100vh - 140px)' }}
+            className="feed-card animate-fade-in mx-3 mt-2 cursor-pointer"
             onClick={() => {
               if (isSwiping.current) { isSwiping.current = false; return }
               navigate(`/movie/${movieId}`)
             }}
           >
+            {/* Layer 1: Blurred ambient background */}
+            <MoviePoster
+              posterUrl={movie.posterUrl}
+              title={movie.title}
+              variant="ambient"
+              loading="eager"
+            />
+
+            {/* Layer 2: Crisp contained poster */}
             <MoviePoster
               posterUrl={movie.posterUrl}
               title={movie.title}
               size="original"
-              className="absolute inset-0 w-full h-full"
-            />
-            {/* Gradient overlay */}
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 30%, rgba(10,10,10,0.85) 75%, #0a0a0a 100%)',
-              }}
+              variant="contained"
+              loading="eager"
+              fetchPriority="high"
+              sizes="(max-width: 768px) 90vw, 60vw"
             />
 
             {/* Star rating top right */}
             {movie.averageRating ? (
-              <div className="absolute top-4 right-4 chip-pink flex items-center gap-1 backdrop-blur-md">
+              <div className="absolute top-4 right-4 chip-pink flex items-center gap-1 backdrop-blur-md" style={{ zIndex: 4 }}>
                 <span>★</span>
                 <span className="font-bold">{Number(movie.averageRating).toFixed(1)}</span>
               </div>
             ) : null}
 
-            {/* Bottom info */}
-            <div className="absolute bottom-0 left-0 right-0 p-5 pr-20">
+            {/* Bottom info overlay */}
+            <div className="feed-card-info">
               {movie.genre?.[0] && (
                 <span className="chip-genre inline-block mb-3">{movie.genre[0]}</span>
               )}
@@ -196,20 +210,20 @@ export default function FeedPage() {
                 {movie.title}
               </h1>
               {movie.explanation && (
-                <p className="text-text-primary text-sm leading-relaxed line-clamp-3">
+                <p className="text-text-primary text-sm leading-relaxed line-clamp-6 max-w-3xl">
                   <span className="text-pink-neon font-semibold">AI Insight: </span>
                   {movie.explanation}
                 </p>
               )}
               {!movie.explanation && movie.description && (
-                <p className="text-text-secondary text-sm leading-relaxed line-clamp-3">
+                <p className="text-text-secondary text-sm leading-relaxed line-clamp-6 max-w-3xl">
                   {movie.description}
                 </p>
               )}
             </div>
 
             {/* Side action rail */}
-            <div className="absolute right-4 bottom-32 flex flex-col gap-4">
+            <div className="absolute right-4 bottom-32 flex flex-col gap-4" style={{ zIndex: 4 }}>
               <ActionButton
                 onClick={(e) => {
                   e.stopPropagation()
@@ -261,7 +275,7 @@ export default function FeedPage() {
           </div>
 
           {/* Counter / nav hints */}
-          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 text-text-muted text-xs tracking-widest uppercase">
+          <div className="text-center text-text-muted text-xs tracking-widest uppercase mt-3 pb-2">
             {index + 1} / {movies.length} • swipe up
           </div>
         </main>

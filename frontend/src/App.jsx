@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { PetProvider } from './context/PetContext'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -29,9 +29,11 @@ export default function App() {
 
 function AppShell() {
   const { isAuthenticated } = useAuth()
+  const { pathname } = useLocation()
+  const authPages = ['/', '/login', '/signup']
   return (
     <>
-      {isAuthenticated && <PetCompanion />}
+      {isAuthenticated && !authPages.includes(pathname) && <PetCompanion />}
       <ToastStack />
       <AuthGateModal />
       <Routes>

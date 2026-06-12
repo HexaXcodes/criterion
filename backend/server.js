@@ -1,5 +1,5 @@
+require("dotenv").config();
 const express = require("express");
-const dotenv = require("dotenv");
 const http = require("http");
 const { Server } = require("socket.io");
 const connectDB = require("./src/config/db");
@@ -13,7 +13,6 @@ const chatRoutes = require("./src/routes/chatRoutes");
 const Message = require("./src/models/Message");
 const jwt = require("jsonwebtoken");
 
-dotenv.config();
 connectDB();
 
 // Backfill language for movies missing it — runs in background after DB connects

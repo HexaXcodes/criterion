@@ -5,11 +5,19 @@ const http = require("http");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const getMLRecommendations = (genres, watchedIds, likedGenres) => {
+const getMLRecommendations = (genres, watchedIds, likedGenres, options = {}) => {
   return new Promise((resolve, reject) => {
-    const payload = JSON.stringify({ genres, watchedIds, likedGenres });
+    const payload = JSON.stringify({
+      genres,
+      watchedIds,
+      likedGenres,
+      excludeIds: options.excludeIds || watchedIds,
+      watchlistGenres: options.watchlistGenres || [],
+      tasteTexts: options.tasteTexts || [],
+      languages: options.languages || ["en"]
+    });
 
-    const options = {
+    const requestOptions = {
       hostname: "localhost",
       port: 5001,
       path: "/recommend",
@@ -20,7 +28,7 @@ const getMLRecommendations = (genres, watchedIds, likedGenres) => {
       }
     };
 
-    const req = http.request(options, (res) => {
+    const req = http.request(requestOptions, (res) => {
       let data = "";
       res.on("data", chunk => data += chunk);
       res.on("end", () => resolve(JSON.parse(data)));
@@ -28,6 +36,37 @@ const getMLRecommendations = (genres, watchedIds, likedGenres) => {
 
     req.on("error", reject);
     req.write(payload);
+    req.end();
+  });
+};
+
+const getMLHealth = () => {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: "localhost",
+        port: 5001,
+        path: "/health",
+        method: "GET",
+        timeout: 1500
+      },
+      (res) => {
+        let data = "";
+        res.on("data", chunk => data += chunk);
+        res.on("end", () => {
+          try {
+            resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, data: JSON.parse(data) });
+          } catch {
+            resolve({ ok: false, data: null });
+          }
+        });
+      }
+    );
+
+    req.on("timeout", () => {
+      req.destroy(new Error("ML service timed out"));
+    });
+    req.on("error", reject);
     req.end();
   });
 };
@@ -57,6 +96,25 @@ const buildUserProfile = (user, highRatedReviews) => {
     watchedCount: user.watchedMovies.length,
     preferenceGenres: user.preferences.genres,
     favoriteActors: user.preferences.favoriteActors || []
+  };
+};
+
+const buildWatchlistProfile = async (user) => {
+  const watchlistIds = user.watchlist.map(id => id.toString());
+  if (watchlistIds.length === 0) {
+    return { watchlistIds, watchlistGenres: [], tasteTexts: [] };
+  }
+
+  const watchlistMovies = await Movie.find({ _id: { $in: watchlistIds } })
+    .select("title genre description")
+    .lean();
+
+  return {
+    watchlistIds,
+    watchlistGenres: watchlistMovies.flatMap(m => m.genre || []),
+    tasteTexts: watchlistMovies.map(m =>
+      [m.title, ...(m.genre || []), m.description || ""].join(" ")
+    )
   };
 };
 
@@ -145,11 +203,18 @@ exports.autoPopulateWatchlist = async (userId) => {
 
     const watchedIds = user.watchedMovies.map(id => id.toString());
     const watchlistIds = user.watchlist.map(id => id.toString());
+    const watchlistProfile = await buildWatchlistProfile(user);
 
     const result = await getMLRecommendations(
       user.preferences.genres,
       watchedIds,
-      profile.likedGenres
+      profile.likedGenres,
+      {
+        excludeIds: [...new Set([...watchedIds, ...watchlistIds])],
+        watchlistGenres: watchlistProfile.watchlistGenres,
+        tasteTexts: watchlistProfile.tasteTexts,
+        languages: user.preferences.languages || ["en"]
+      }
     );
 
     if (!result.recommendations) return null;
@@ -193,32 +258,72 @@ exports.autoPopulateWatchlist = async (userId) => {
   }
 };
 
-// Fall back to top-rated DB movies shaped like ML recommendations
-const getFallbackMovies = async (preferredGenres, watchedIds, limit = 5) => {
+// Fall back to personalized DB movies based on preferred, liked, and watchlist genres and language
+const getFallbackMovies = async (preferredGenres = [], excludedIds = [], limit = 5, preferredLanguages = ["en"], likedGenres = [], watchlistGenres = []) => {
   const filter = {};
-  if (preferredGenres && preferredGenres.length > 0) {
-    filter.genre = { $in: preferredGenres };
+  if (preferredLanguages && preferredLanguages.length > 0) {
+    filter.language = { $in: [...preferredLanguages, null, ""] };
   }
-  if (watchedIds && watchedIds.length > 0) {
-    filter._id = { $nin: watchedIds };
+  if (excludedIds && excludedIds.length > 0) {
+    filter._id = { $nin: excludedIds };
   }
 
-  let movies = await Movie.find(filter)
+  // Get a larger pool of candidate movies matching language/exclusion criteria
+  // We sort by averageRating desc to get high-quality candidates, but we will rank them based on preferences
+  let candidates = await Movie.find(filter)
     .sort({ averageRating: -1 })
-    .limit(limit)
+    .limit(150)
     .lean();
 
-  // If genre filter returned too few, top up with any top-rated movies
-  if (movies.length < limit) {
-    const seenIds = movies.map(m => m._id.toString());
-    const extra = await Movie.find({ _id: { $nin: [...(watchedIds || []), ...seenIds] } })
-      .sort({ averageRating: -1 })
-      .limit(limit - movies.length)
-      .lean();
-    movies = [...movies, ...extra];
-  }
+  // Score candidates in memory
+  const scored = candidates.map(m => {
+    let score = 0;
+    const movieGenres = m.genre || [];
 
-  return movies.map(m => ({
+    // 1. Genre matching
+    movieGenres.forEach(g => {
+      // High weight for genres user has actively liked (via high-rated reviews)
+      if (likedGenres.includes(g)) {
+        score += 5.0;
+      }
+      // Weight for watchlist genres
+      if (watchlistGenres.includes(g)) {
+        score += 3.0;
+      }
+      // Weight for preferred genres (from preference list)
+      if (preferredGenres.includes(g)) {
+        score += 1.5;
+      }
+    });
+
+    // If movie doesn't overlap with any of user's preferred or liked/watchlist genres, penalize it heavily
+    const hasOverlap = movieGenres.some(g =>
+      likedGenres.includes(g) || watchlistGenres.includes(g) || preferredGenres.includes(g)
+    );
+    if (!hasOverlap && (preferredGenres.length > 0 || likedGenres.length > 0)) {
+      score -= 15.0;
+    }
+
+    // 2. Language match boost
+    if (preferredLanguages.includes(m.language)) {
+      score += 3.0;
+    } else if (!m.language) {
+      score += 0.5; // legacy movie
+    }
+
+    // 3. Rating quality as a minor tie-breaker (max 1.0)
+    const rating = m.averageRating || 0;
+    score += (rating / 5.0) * 1.0;
+
+    return { movie: m, score };
+  });
+
+  // Sort descending by score
+  scored.sort((a, b) => b.score - a.score);
+
+  const selected = scored.slice(0, limit).map(s => s.movie);
+
+  return selected.map(m => ({
     id: m._id.toString(),
     _id: m._id.toString(),
     title: m.title,
@@ -227,6 +332,7 @@ const getFallbackMovies = async (preferredGenres, watchedIds, limit = 5) => {
     averageRating: m.averageRating,
     description: m.description,
     releaseYear: m.releaseYear,
+    language: m.language,
     similarityScore: 0.7
   }));
 };
@@ -248,19 +354,49 @@ exports.getRecommendationsWithExplanations = async (req, res) => {
       ...user.watchedMovies.map(id => id.toString()),
       ...excludeParam
     ])]
+    const watchlistProfile = await buildWatchlistProfile(user);
+    const excludedIds = [...new Set([...watchedIds, ...watchlistProfile.watchlistIds])];
+    const fallbackGenres = [
+      ...(user.preferences.genres || []),
+      ...watchlistProfile.watchlistGenres
+    ];
+
+    const userLanguages = user.preferences.languages && user.preferences.languages.length > 0
+      ? user.preferences.languages
+      : ["en"];
 
     let recommendations;
     try {
       const result = await getMLRecommendations(
         user.preferences.genres,
         watchedIds,
-        profile.likedGenres
+        profile.likedGenres,
+        {
+          excludeIds: excludedIds,
+          watchlistGenres: watchlistProfile.watchlistGenres,
+          tasteTexts: watchlistProfile.tasteTexts,
+          languages: userLanguages
+        }
       );
       recommendations = result.recommendations && result.recommendations.length > 0
         ? result.recommendations.slice(0, 5)
-        : await getFallbackMovies(user.preferences.genres, watchedIds);
+        : await getFallbackMovies(
+            user.preferences.genres,
+            excludedIds,
+            5,
+            userLanguages,
+            profile.likedGenres,
+            watchlistProfile.watchlistGenres
+          );
     } catch {
-      recommendations = await getFallbackMovies(user.preferences.genres, watchedIds);
+      recommendations = await getFallbackMovies(
+        user.preferences.genres,
+        excludedIds,
+        5,
+        userLanguages,
+        profile.likedGenres,
+        watchlistProfile.watchlistGenres
+      );
     }
 
     const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -293,5 +429,22 @@ exports.getRecommendationsWithExplanations = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getRecommendationHealth = async (req, res) => {
+  try {
+    const health = await getMLHealth();
+    res.json({
+      mlService: health.ok ? "online" : "unhealthy",
+      fallback: !health.ok,
+      detail: health.data
+    });
+  } catch (error) {
+    res.json({
+      mlService: "offline",
+      fallback: true,
+      message: error.message
+    });
   }
 };

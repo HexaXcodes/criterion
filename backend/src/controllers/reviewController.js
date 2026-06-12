@@ -1,5 +1,6 @@
 const Review = require("../models/Review");
 const Movie = require("../models/Movie");
+const User = require("../models/User");
 exports.addReview = async (req, res) => {
   try {
     console.log("Body:", req.body);
@@ -24,6 +25,10 @@ exports.addReview = async (req, res) => {
       allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
 
     await Movie.findByIdAndUpdate(movieId, { averageRating: avg.toFixed(1) });
+    await User.findByIdAndUpdate(req.user.id, {
+      $addToSet: { watchedMovies: movieId },
+      $pull: { watchlist: movieId }
+    });
 
     res.status(201).json({ message: "Review added", review });
   } catch (error) {

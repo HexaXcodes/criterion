@@ -17,6 +17,13 @@ const generateVerificationCode = () => {
 };
 
 /**
+ * Generate a secure reset token
+ */
+const generateResetToken = () => {
+  return crypto.randomBytes(32).toString("hex");
+};
+
+/**
  * SIGNUP - Register a new user
  */
 exports.signup = async (req, res) => {
@@ -38,9 +45,7 @@ exports.signup = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
-    const userExists = await User.findOne({ email: normalizedEmail });
+    const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ 
         message: "User already exists with this email",
@@ -52,13 +57,13 @@ exports.signup = async (req, res) => {
 
     const user = await User.create({
       name,
-      email: normalizedEmail,
+      email,
       password: hashedPassword,
     });
 
     // Send welcome email
     try {
-      await sendWelcomeEmail(normalizedEmail, name);
+      await sendWelcomeEmail(email, name);
     } catch (emailError) {
       console.error("Welcome email failed:", emailError);
       // Don't fail signup if email fails
@@ -96,9 +101,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ 
         message: "Invalid credentials",
@@ -206,9 +209,7 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email });
     if (!user) {
       // Don't reveal if email exists for security
       return res.json({ 
@@ -227,6 +228,7 @@ exports.forgotPassword = async (req, res) => {
 
     user.resetToken = hashedCode;
     user.resetTokenExpiry = expiryTime;
+    user.plainResetCode = code; // Temporary - remove after sending email
     
     await user.save();
 
@@ -234,23 +236,17 @@ exports.forgotPassword = async (req, res) => {
     const resetLink = `${process.env.FRONTEND_URL}/reset-password?code=${code}`;
     
     try {
-      await sendPasswordResetEmail(normalizedEmail, user.name, code, resetLink);
+      await sendPasswordResetEmail(email, user.name, code, resetLink);
     } catch (emailError) {
-      console.error("Email sending failed:", emailError);
-      // If we're in development mode, let's log the code and succeed so developers can test the feature easily
-      if (process.env.NODE_ENV === "development") {
-        console.log(`[DEV ONLY] Recovery code for ${email}: ${code}`);
-      } else {
-        // Remove the reset token if email fails in production
-        user.resetToken = null;
-        user.resetTokenExpiry = null;
-        await user.save();
-        
-        return res.status(500).json({ 
-          message: "Failed to send email. Please try again.",
-          success: false 
-        });
-      }
+      // Remove the reset token if email fails
+      user.resetToken = null;
+      user.resetTokenExpiry = null;
+      await user.save();
+      
+      return res.status(500).json({ 
+        message: "Failed to send email. Please try again.",
+        success: false 
+      });
     }
 
     res.json({ 
@@ -282,9 +278,7 @@ exports.verifyResetToken = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email });
 
     if (!user || !user.resetToken) {
       return res.status(400).json({ 
@@ -317,7 +311,7 @@ exports.verifyResetToken = async (req, res) => {
 
     // Generate a JWT token for password reset
     const resetToken = jwt.sign(
-      { id: user._id, email: normalizedEmail },
+      { id: user._id, email: user.email },
       process.env.JWT_SECRET + "RESET",
       { expiresIn: "1h" }
     );
@@ -369,9 +363,7 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email });
 
     if (!user || user._id.toString() !== decoded.id) {
       return res.status(400).json({ 
@@ -387,12 +379,13 @@ exports.resetPassword = async (req, res) => {
     user.password = hashedPassword;
     user.resetToken = null;
     user.resetTokenExpiry = null;
+    user.plainResetCode = undefined; // Remove temporary field
 
     await user.save();
 
     // Send confirmation email
     try {
-      await sendPasswordChangedEmail(normalizedEmail, user.name);
+      await sendPasswordChangedEmail(email, user.name);
     } catch (emailError) {
       console.error("Password changed email failed:", emailError);
       // Don't fail the reset if confirmation email fails

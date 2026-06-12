@@ -32,6 +32,58 @@ const httpsGet = (url, headers = {}) =>
     req.end();
   });
 
+// Helper: HTTP GET for raw text response (useful for scraping/fallbacks)
+const httpsGetRaw = (url) =>
+  new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const options = {
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+      }
+    };
+    const req = https.request(options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(data);
+        } else {
+          reject(new Error(`HTTP ${res.statusCode}`));
+        }
+      });
+    });
+    req.on("error", reject);
+    req.end();
+  });
+
+// Helper: Scrape YouTube to find first video ID for a trailer query
+const getYoutubeScrapedKey = async (title, year) => {
+  try {
+    const searchQuery = encodeURIComponent(`${title} ${year || ''} official trailer`);
+    const url = `https://www.youtube.com/results?search_query=${searchQuery}`;
+    const html = await httpsGetRaw(url);
+    const match = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+    const altMatch = html.match(/\/watch\?v=([a-zA-Z0-9_-]{11})/);
+    return (match && match[1]) || (altMatch && altMatch[1]) || null;
+  } catch (err) {
+    console.error("YouTube scraper fallback failed:", err.message);
+    return null;
+  }
+};
+
+const NSFW_REGEX = /sex|bikini|swapping|affair|erotic|erotica|sensual|adult|18\+|nsfw|uncensored|kamasutra|softcore|seduce|seduction|naked|mistress|porn/i;
+const getSafeFilter = (baseFilter = {}, bypassRegex = false) => {
+  const filter = { ...baseFilter, isNSFW: { $ne: true } };
+  if (!bypassRegex) {
+    filter.title = { $not: NSFW_REGEX };
+    filter.description = { $not: NSFW_REGEX };
+  }
+  return filter;
+};
+
 exports.addMovie = async (req, res) => {
   try {
     const { title, description, genre, releaseYear, posterUrl } = req.body;
@@ -54,7 +106,7 @@ exports.getAllMovies = async (req, res) => {
     const sort = req.query.sort === 'rating'
       ? { averageRating: -1 }
       : { createdAt: -1 };
-    const q = Movie.find().sort(sort);
+    const q = Movie.find(getSafeFilter()).sort(sort);
     if (limit) q.limit(limit);
     const movies = await q;
     res.json(movies);
@@ -99,7 +151,8 @@ exports.searchMovies = async (req, res) => {
     }
 
     const langs = req.query.langs ? req.query.langs.split(",").filter(Boolean) : [];
-    const total = await Movie.countDocuments(filter);
+    const safeFilter = getSafeFilter(filter, !!query);
+    const total = await Movie.countDocuments(safeFilter);
 
     let movies;
     if (langs.length > 0) {
@@ -107,7 +160,7 @@ exports.searchMovies = async (req, res) => {
       const [sortKey] = Object.keys(sortOrder);
       const [sortDir] = Object.values(sortOrder);
       movies = await Movie.aggregate([
-        { $match: filter },
+        { $match: safeFilter },
         { $addFields: { _langPrio: { $cond: [{ $in: ["$language", langs] }, 0, 1] } } },
         { $sort: { _langPrio: 1, [sortKey]: sortDir } },
         { $skip: skip },
@@ -115,7 +168,7 @@ exports.searchMovies = async (req, res) => {
         { $project: { _langPrio: 0 } },
       ]);
     } else {
-      movies = await Movie.find(filter).sort(sortOrder).skip(skip).limit(limit);
+      movies = await Movie.find(safeFilter).sort(sortOrder).skip(skip).limit(limit);
     }
 
     res.json({ movies, total, page, limit });
@@ -130,14 +183,14 @@ const serveFallback = async (user, res) => {
     const watchedIds = user.watchedMovies.map(id => id.toString());
     const preferredGenres = user.preferences.genres || [];
 
-    const filter = { _id: { $nin: watchedIds } };
+    const filter = getSafeFilter({ _id: { $nin: watchedIds } });
     if (preferredGenres.length > 0) filter.genre = { $in: preferredGenres };
 
     let movies = await MovieModel.find(filter).sort({ averageRating: -1 }).limit(5).lean();
 
     if (movies.length < 5) {
       const seenIds = movies.map(m => m._id.toString());
-      const extra = await MovieModel.find({ _id: { $nin: [...watchedIds, ...seenIds] } })
+      const extra = await MovieModel.find(getSafeFilter({ _id: { $nin: [...watchedIds, ...seenIds] } }))
         .sort({ averageRating: -1 }).limit(5 - movies.length).lean();
       movies = [...movies, ...extra];
     }
@@ -234,7 +287,7 @@ exports.getGenreSections = async (req, res) => {
 
     const sections = await Promise.all(
       BROWSABLE_GENRES.map(async (genre) => {
-        const baseFilter = { genre: { $in: [genre] }, posterUrl: { $ne: "" } };
+        const baseFilter = getSafeFilter({ genre: { $in: [genre] }, posterUrl: { $ne: "" } });
         let movies;
         if (langs.length > 0) {
           movies = await Movie.aggregate([
@@ -297,21 +350,40 @@ exports.getMovieTrailer = async (req, res) => {
       }
     }
 
-    if (!tmdbId) return res.status(404).json({ message: "No trailer found for this title" });
+    let youtubeKey = null;
+    let trailerTitle = `${movie.title} Trailer`;
 
-    const videosData = await httpsGet(
-      `https://api.themoviedb.org/3/movie/${tmdbId}/videos?language=en-US`,
-      authHeaders
-    );
+    if (tmdbId) {
+      try {
+        const videosData = await httpsGet(
+          `https://api.themoviedb.org/3/movie/${tmdbId}/videos?language=en-US`,
+          authHeaders
+        );
 
-    const trailer =
-      videosData.results?.find((v) => v.type === "Trailer" && v.site === "YouTube") ||
-      videosData.results?.find((v) => v.type === "Teaser" && v.site === "YouTube") ||
-      videosData.results?.find((v) => v.site === "YouTube");
+        const trailer =
+          videosData.results?.find((v) => v.type === "Trailer" && v.site === "YouTube") ||
+          videosData.results?.find((v) => v.type === "Teaser" && v.site === "YouTube") ||
+          videosData.results?.find((v) => v.site === "YouTube");
 
-    if (!trailer) return res.status(404).json({ message: "No trailer found for this title" });
+        if (trailer) {
+          youtubeKey = trailer.key;
+          trailerTitle = trailer.name;
+        }
+      } catch (err) {
+        console.error("TMDB videos fetch failed:", err.message);
+      }
+    }
 
-    res.json({ youtubeKey: trailer.key, title: trailer.name });
+    // Fallback if TMDB couldn't find a trailer
+    if (!youtubeKey) {
+      youtubeKey = await getYoutubeScrapedKey(movie.title, movie.releaseYear);
+    }
+
+    if (!youtubeKey) {
+      return res.status(404).json({ message: "No trailer found for this title" });
+    }
+
+    res.json({ youtubeKey, title: trailerTitle });
   } catch (error) {
     console.error("Trailer fetch error:", error.message);
     res.status(500).json({ message: error.message });
