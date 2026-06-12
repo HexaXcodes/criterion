@@ -85,8 +85,8 @@ const buildUserProfile = (user, highRatedReviews) => {
 
   const likedMoviesText = likedMovies.length > 0
     ? likedMovies
-        .map(m => `"${m.title}" (${m.rating}/5, ${m.genres.join("/")} )`)
-        .join("; ")
+      .map(m => `"${m.title}" (${m.rating}/5, ${m.genres.join("/")} )`)
+      .join("; ")
     : "No reviews yet";
 
   return {
@@ -253,7 +253,7 @@ exports.autoPopulateWatchlist = async (userId) => {
 
     return moviesWithReasons;
   } catch (error) {
-    console.error("Auto watchlist error:", error.message);
+    console.error("Auto watchlist error:", JSON.stringify(error, null, 2));
     return null;
   }
 };
@@ -381,13 +381,13 @@ exports.getRecommendationsWithExplanations = async (req, res) => {
       recommendations = result.recommendations && result.recommendations.length > 0
         ? result.recommendations.slice(0, 5)
         : await getFallbackMovies(
-            user.preferences.genres,
-            excludedIds,
-            5,
-            userLanguages,
-            profile.likedGenres,
-            watchlistProfile.watchlistGenres
-          );
+          user.preferences.genres,
+          excludedIds,
+          5,
+          userLanguages,
+          profile.likedGenres,
+          watchlistProfile.watchlistGenres
+        );
     } catch {
       recommendations = await getFallbackMovies(
         user.preferences.genres,
