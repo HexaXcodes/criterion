@@ -142,31 +142,25 @@ Resend Email Service
 
 ## Screenshots
 
-### Homepage
+### Landing Page
 
-![Homepage](screenshots/homepage.png)
+![Landing Page](screenshots/landing-page.png)
 
-### Movie Details
+### Community Feed
 
-![Movie Details](screenshots/movie-details.png)
-
-### Community Discussions
-
-![Community](screenshots/community.png)
-
-### Real-Time Chat
-
-![Chat](screenshots/chat.png)
+![Community Feed](screenshots/feed-page.png)
 
 ### User Profile
 
-![Profile](screenshots/profile.png)
+![User Profile](screenshots/profile-page.png)
 
-### Architecture Diagram
+### Real-Time Chat
 
-![Architecture](screenshots/architecture.png)
+![Chat Room](screenshots/chat-room.png)
 
----
+### System Architecture
+
+![Architecture Diagram](screenshots/architecture-diagram.png)
 
 ## Installation
 
